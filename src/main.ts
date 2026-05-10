@@ -1,9 +1,18 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import * as path from 'path'
-import { spawn } from 'node-pty'
-import os from 'os'
+import * as os from 'os'
+import { spawn, IPty } from 'node-pty'
 
 let mainWindow: BrowserWindow | null
+const ptyProcesses: Map<number, IPty> = new Map()
+
+function getPtyProcess(pid: number) {
+  return ptyProcesses.get(pid)
+}
+
+function removePtyProcess(pid: number) {
+  ptyProcesses.delete(pid)
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -12,18 +21,16 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false, // Disable nodeIntegration for security
+      nodeIntegration: false,
     },
   })
 
-  // Load the index.html from the Vite dev server or from the build output
   if (process.env.NODE_ENV === 'development' && process.env['VITE_DEV_SERVER_URL']) {
     mainWindow.loadURL(process.env['VITE_DEV_SERVER_URL'])
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
   }
 
-  // Open the DevTools automatically if in development
   if (process.env.NODE_ENV === 'development') {
     mainWindow.webContents.openDevTools()
   }
@@ -33,7 +40,6 @@ function createWindow() {
   })
 }
 
-// Quit when all windows are closed, except on macOS
 app.on('window-all-closed', () => {
   if (os.platform() !== 'darwin') {
     app.quit()
@@ -41,66 +47,63 @@ app.on('window-all-closed', () => {
 })
 
 app.on('activate', () => {
-  // On macOS, re-create a window when the dock icon is clicked and no other windows are open.
   if (BrowserWindow.getAllWindows().length === 0) createWindow()
 })
 
-// Create the window when the app is ready
 app.whenReady().then(() => {
   createWindow()
 
-  // Handle IPC messages for spawning terminals
-  ipcMain.on('pty-spawn', async (event, { command, args = [], cwd = process.cwd() }) => {
-    const shell = os.platform() === 'win32' ? 'powershell.exe' : 'bash'
-    const ptyProcess = spawn(shell, args, {
-      name: 'xterm-color',
-      cols: 80,
-      rows: 30,
-      cwd: cwd,
-      env: process.env as Record<string, string | undefined>,
-    })
+  ipcMain.on('pty-spawn', (event, { command, args = [], cwd = os.homedir() }) => {
+    try {
+      const shell = os.platform() === 'win32' ? 'powershell.exe' : 'bash'
+      const execCommand = os.platform() === 'win32' ? command : (command.startsWith('/') ? command : `/${command}`)
+      const spawnArgs = os.platform() === 'win32' ? ['-Command', command, ...args] : args
 
-    const pid = ptyProcess.pid
+      const ptyProcess = spawn(os.platform() === 'win32' ? shell : execCommand, spawnArgs, {
+        name: 'xterm-color',
+        cols: 80,
+        rows: 30,
+        cwd: cwd,
+        env: process.env as Record<string, string | undefined>,
+      })
 
-    // Forward data from pty to renderer
-    ptyProcess.onData((data) => {
-      if (mainWindow) {
-        mainWindow.webContents.send('pty-data', pid, data)
-      }
-    })
+      const pid = ptyProcess.pid
 
-    // Forward exit signal from pty to renderer
-    ptyProcess.onExit(() => {
-      if (mainWindow) {
-        mainWindow.webContents.send('pty-exit', pid)
-      }
-    })
+      ptyProcess.onData((data) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('pty-data', pid, data)
+        }
+      })
 
-    // Reply with the PID to the renderer process so it can manage the terminal
-    event.reply('pty-spawned', { pid, command, cwd })
+      ptyProcess.onExit(({ exitCode }) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('pty-exit', pid, exitCode)
+        }
+        removePtyProcess(pid)
+      })
 
-    // Store the ptyProcess
-    ptyProcesses.set(pid, ptyProcess)
+      ptyProcesses.set(pid, ptyProcess)
+      event.reply('pty-spawned', { pid, command, cwd })
+    } catch (error: any) {
+      event.reply('pty-spawned', { error: error.message || 'Failed to spawn terminal' })
+    }
   })
 
-  // Handle IPC messages for sending data to pty
-  ipcMain.on('pty-write', (event, { pid, data }) => {
+  ipcMain.on('pty-write', (_event, { pid, data }) => {
     const ptyProcess = getPtyProcess(pid)
     if (ptyProcess) {
       ptyProcess.write(data)
     }
   })
 
-  // Handle IPC messages for resizing pty
-  ipcMain.on('pty-resize', (event, { pid, cols, rows }) => {
+  ipcMain.on('pty-resize', (_event, { pid, cols, rows }) => {
     const ptyProcess = getPtyProcess(pid)
     if (ptyProcess) {
       ptyProcess.resize(cols, rows)
     }
   })
 
-  // Handle IPC messages for killing pty
-  ipcMain.on('pty-kill', (event, { pid }) => {
+  ipcMain.on('pty-kill', (_event, { pid }) => {
     const ptyProcess = getPtyProcess(pid)
     if (ptyProcess) {
       ptyProcess.kill()
@@ -108,14 +111,3 @@ app.whenReady().then(() => {
     }
   })
 })
-
-// Simple map to store PTY processes
-const ptyProcesses: Map<number, import('node-pty').IPty> = new Map()
-
-function getPtyProcess(pid: number) {
-  return ptyProcesses.get(pid)
-}
-
-function removePtyProcess(pid: number) {
-  ptyProcesses.delete(pid)
-}
