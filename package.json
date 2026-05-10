@@ -5,7 +5,7 @@
   "main": "dist/main.js",
   "scripts": {
     "dev": "vite",
-    "postinstall": "electron-rebuild -f -w node-pty",
+    "postinstall": "electron-rebuild -f -w node-pty && node -e \"const fs=require('fs');const src='node_modules/node-pty/build/Release/pty.node';const dst='dist/pty.node';fs.copyFileSync(src,dst);\"",
     "build": "tsc && vite build && electron-builder",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",

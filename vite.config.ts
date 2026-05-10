@@ -4,19 +4,33 @@ import electron from 'vite-plugin-electron'
 import renderer from 'vite-plugin-electron-renderer'
 import path from 'path'
 
-// https://vitejs.dev/config/
+function nodeModulesPlugin() {
+  return {
+    name: 'node-modules-plugin',
+    configResolved(config) {
+      const externals = config.build.rollupOptions.external || []
+      if (!Array.isArray(externals)) return
+      if (!externals.includes('node-pty')) {
+        config.build.rollupOptions.external = [...externals, 'node-pty']
+      }
+    }
+  }
+}
+
 export default defineConfig({
   plugins: [
+    nodeModulesPlugin(),
     react(),
     electron([
       {
-        // Main process
         entry: 'src/main.ts',
         vite: {
           build: {
             outDir: 'dist',
+            rollupOptions: {
+              external: ['node-pty', 'electron'],
+            },
           },
-          external: ['node-pty'],
         },
       },
       {
@@ -36,13 +50,10 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173, // Default Vite dev server port
+    port: 5173,
   },
   build: {
-    // In Electron, you can set target to 'nodeN' or 'esN' to match your Electron build target
-    // Example: target: 'node18', // for Electron 18
-    // Electron's Node.js version varies, check your Electron version's Node.js compatibility.
-    target: 'es2020', // Use a more modern target compatible with recent Electron versions
+    target: 'es2020',
     outDir: 'dist',
     emptyOutDir: true,
   },
