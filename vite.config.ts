@@ -19,12 +19,7 @@ export default defineConfig({
         },
       },
       {
-        // --- Ủýêðæéòóòþýõïôùæþéòôùþðàûú
         entry: 'src/preload.ts',
-        onstart (options) {
-          // Automatically recompile the main process when the preloads change
-          options.watch(['src/preload.ts'])
-        },
         vite: {
           build: {
             outDir: 'dist',
