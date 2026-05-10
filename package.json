@@ -5,6 +5,7 @@
   "main": "dist/main.js",
   "scripts": {
     "dev": "vite",
+    "postinstall": "electron-rebuild -f -w node-pty",
     "build": "tsc && vite build && electron-builder",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",

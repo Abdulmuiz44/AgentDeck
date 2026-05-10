@@ -1,0 +1,14 @@
+allowBuilds:
+  ' ': true
+  '-': true
+  c: true
+  d: true
+  e: true
+  l: true
+  n: true
+  node-pty: false
+  o: true
+  p: true
+  r: true
+  t: true
+  y: true
