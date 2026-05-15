@@ -1,0 +1,53 @@
+flowchart TB
+  subgraph Access["Access Layer"]
+    Phone["Phone Control"]
+    Desktop["Desktop Dashboard"]
+    CLI["CLI"]
+    APIClients["Local API Clients"]
+  end
+
+  subgraph Core["AgentDeck Core"]
+    Daemon["Daemon / Background Service"]
+    HTTP["Local HTTP API"]
+    Sessions["Session Manager"]
+    Config["Project & Config Manager"]
+    Discovery["Discovery Engine"]
+  end
+
+  subgraph Adapters["Agent Adapter Registry"]
+    CodexCLI["Codex CLI"]
+    CodexApp["Codex App"]
+    Claude["Claude Code"]
+    OpenCode["OpenCode"]
+    GeminiCLI["Gemini CLI"]
+    OllamaRuntime["Ollama Runtime"]
+  end
+
+  subgraph Providers["Provider Router"]
+    Ollama["Ollama Local"]
+    OpenRouter["OpenRouter"]
+    Custom["Custom OpenAI-Compatible"]
+    Anthropic["Anthropic"]
+    Gemini["Gemini"]
+  end
+
+  subgraph Storage["Execution & Storage Layer"]
+    Paths["Local Project Paths"]
+    Processes["Child Processes / Agent Sessions"]
+    Logs["Logs & Session History"]
+    Settings["Settings / Local Persistence"]
+  end
+
+  subgraph Outcomes["Outcomes"]
+    DiscoverTools["Discover installed tools"]
+    ConfigureProviders["Configure providers"]
+    LaunchSessions["Launch and resume sessions"]
+    GenerateConfigs["Generate Codex/OpenCode configs"]
+    ManageProjects["Manage projects across devices"]
+  end
+
+  Access --> Core
+  Core --> Adapters
+  Core --> Providers
+  Core --> Storage
+  Storage --> Outcomes

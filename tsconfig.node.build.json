@@ -12,8 +12,17 @@
     "rootDir": "src",
     "declaration": false,
     "sourceMap": true,
-    "lib": ["ES2022"],
-    "types": ["node"]
+    "lib": [
+      "ES2022"
+    ],
+    "types": [
+      "node"
+    ],
+    "ignoreDeprecations": "5.0"
   },
-  "include": ["src/main/**/*.ts", "src/preload/**/*.ts"]
+  "include": [
+    "src/main/**/*.ts",
+    "src/preload/**/*.ts",
+    "src/cli/**/*.ts"
+  ]
 }

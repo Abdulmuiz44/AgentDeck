@@ -1,68 +1,36 @@
-# AgentDeck Roadmap
+# Roadmap
 
-## v0.1.0 — MVP (Current)
+## Implemented now
 
-- [x] Electron + React + TypeScript + Vite scaffold
-- [x] xterm.js + node-pty terminal integration
-- [x] Workspace CRUD (create, open, delete, list)
-- [x] JSON persistence in `%APPDATA%/AgentDeck/`
-- [x] Package.json script detection
-- [x] Quick launch for npm scripts + AI agent CLIs
-- [x] Multi-pane terminal grid
-- [x] Pane status indicators (Idle, Running, Waiting, Error, Done)
-- [x] Missing command detection with install help
-- [x] Settings page (font size, default shell)
-- [x] Dark mode theme
-- [x] Documentation (README, MVP_PLAN, ARCHITECTURE, ROADMAP)
+- Local daemon, HTTP API, CLI, desktop dashboard, and static dashboard serving.
+- Provider/project/agent/session registries with JSON persistence.
+- PATH-based discovery and known adapter launch metadata.
+- Session create/start/stop/restart, process fallback, optional PTY, log capture, and SSE output streaming.
+- Codex/OpenCode OpenAI-compatible config generation with dry-run and backup behavior.
+- LAN-only Phone Control MVP with pairing, hashed tokens, paired-device revocation, and `/phone` dashboard.
+- Windows service/tray foundations that fail gracefully when unsupported/unavailable.
+- Automated lint/test/build/smoke scripts.
 
-## v0.2.0 — Workspace Enhancements
+## Partial/fallback behavior
 
-- [ ] Save and restore exact pane layout (positions, sizes)
-- [ ] Pane splitting (horizontal/vertical) via drag handles
-- [ ] Rename panes inline
-- [ ] Reorder panes via drag and drop
-- [ ] Keyboard shortcuts (Ctrl+N new pane, Ctrl+W close pane)
-- [ ] Pane zoom/focus mode (maximize single pane temporarily)
+- `node-pty` and Electron are optional dependencies for install reliability; daemon and process mode continue without them.
+- Windows service commands use `sc.exe` directly and are not a full signed installer.
+- Tray state refreshes on menu actions but does not yet poll daemon health continuously.
+- Native QR image rendering is not implemented; Phone Control shows a QR payload/URL.
+- Anthropic/Gemini are provider placeholders for future native routing.
 
-## v0.3.0 — Terminal Experience
+## Near-term hardening
 
-- [ ] Custom font selection (Cascadia Code, Fira Code, JetBrains Mono)
-- [ ] Terminal themes (additional presets beyond dark)
-- [ ] Scrollback buffer configuration
-- [ ] Copy/paste with right-click context menu
-- [ ] Search within terminal output (Ctrl+F)
-- [ ] Clear terminal button per pane
+- Native QR rendering and terminal QR output.
+- Signed Windows installer and service recovery policy.
+- Packaged tray icon and health polling.
+- Per-device phone permissions and audit log.
+- Better xterm.js session attach/fit integration.
+- Structured session event replay and log search.
 
-## v0.4.0 — Agent Integration
+## Later phases
 
-- [ ] Auto-detect installed AI CLIs and highlight available ones
-- [ ] Per-agent configuration (API keys, model selection)
-- [ ] Agent output parsing (detect errors, suggestions)
-- [ ] Session history for agent interactions
-- [ ] Cursor, Aider, Claude Code support
-
-## v0.5.0 — DevOps & Infrastructure
-
-- [ ] WSL detection and auto-configuration
-- [ ] Git integration (show branch, uncommitted changes per workspace)
-- [ ] Environment variable management per workspace
-- [ ] Multi-root workspaces (multiple project folders)
-- [ ] Docker integration (container status, logs)
-
-## v0.6.0 — Polish & Performance
-
-- [ ] Window state persistence (position, size, maximized)
-- [ ] Workspace import/export
-- [ ] Auto-update support (electron-updater)
-- [ ] Crash reporting
-- [ ] Telemetry (opt-in)
-- [ ] Performance: lazy loading for inactive panes
-
-## v1.0.0 — Stable Release
-
-- [ ] Comprehensive test suite
-- [ ] Signed Windows installer
-- [ ] macOS and Linux official support
-- [ ] Plugin/extension API
-- [ ] Marketplace for community extensions
-- [ ] Full accessibility support (screen readers, keyboard nav)
+- Optional secure cloud relay/sync for off-LAN phone control.
+- Team dashboards and policy sharing.
+- Secure OS keychain-backed secret references.
+- Provider/model compatibility recommendations.

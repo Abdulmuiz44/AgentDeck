@@ -1,7 +1,14 @@
-import { spawn, IPty } from 'node-pty';
+import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 import { randomUUID } from 'crypto';
+import { spawnPty, type PtyProcess } from './agentdeck/pty-adapter';
 
-const terminals = new Map<string, IPty>();
+interface TerminalProcess {
+  write(data: string): void;
+  resize(cols: number, rows: number): void;
+  kill(): void;
+}
+
+const terminals = new Map<string, TerminalProcess>();
 
 function getShell(): string {
   const isWindows = process.platform === 'win32';
@@ -39,8 +46,7 @@ export function createTerminal(
   }
 
   const { shell, args } = getShellArgs(command);
-
-  const pty = spawn(shell, args, {
+  const options = {
     cwd: cwd || process.cwd(),
     cols: 80,
     rows: 24,
@@ -48,20 +54,45 @@ export function createTerminal(
       ...process.env,
       TERM: 'xterm-256color',
     },
-    handleFlowControl: true,
-  });
+  };
+  const pty = spawnPty(shell, args, options);
+  if (pty) {
+    wirePty(terminalId, pty, onData, onExit);
+    return terminalId;
+  }
 
-  pty.onData((data: string) => {
-    onData(terminalId, data);
-  });
+  onData(terminalId, '\r\n[AgentDeck] node-pty is unavailable; using process-mode terminal fallback. Interactive behavior may be limited.\r\n');
+  const child = spawn(shell, args, { cwd: options.cwd, env: options.env, shell: false, windowsHide: true });
+  wireChild(terminalId, child, onData, onExit);
+  return terminalId;
+}
 
+function wirePty(terminalId: string, pty: PtyProcess, onData: (terminalId: string, data: string) => void, onExit: (terminalId: string, exitCode: number) => void): void {
+  pty.onData((data: string) => onData(terminalId, data));
   pty.onExit(({ exitCode }: { exitCode: number }) => {
     terminals.delete(terminalId);
     onExit(terminalId, exitCode);
   });
-
   terminals.set(terminalId, pty);
-  return terminalId;
+}
+
+function wireChild(terminalId: string, child: ChildProcessWithoutNullStreams, onData: (terminalId: string, data: string) => void, onExit: (terminalId: string, exitCode: number) => void): void {
+  child.stdout.on('data', (data: Buffer) => onData(terminalId, data.toString()));
+  child.stderr.on('data', (data: Buffer) => onData(terminalId, data.toString()));
+  child.on('exit', (code) => {
+    terminals.delete(terminalId);
+    onExit(terminalId, code ?? 0);
+  });
+  child.on('error', (error) => {
+    terminals.delete(terminalId);
+    onData(terminalId, `\r\n[AgentDeck] terminal failed: ${error.message}\r\n`);
+    onExit(terminalId, 1);
+  });
+  terminals.set(terminalId, {
+    write(data: string) { child.stdin.write(data); },
+    resize() {},
+    kill() { child.kill(process.platform === 'win32' ? undefined : 'SIGTERM'); },
+  });
 }
 
 function spawnCheckTerminal(
@@ -77,24 +108,18 @@ function spawnCheckTerminal(
 
   try {
     const isWindows = process.platform === 'win32';
-    const checkCmd = isWindows ? 'where' : 'which';
     const child = spawn(
       isWindows ? 'cmd.exe' : '/bin/sh',
       isWindows
         ? ['/c', `where ${checkTarget} 2>nul || echo NOT_FOUND`]
         : ['-c', `which ${checkTarget} 2>/dev/null || echo NOT_FOUND`],
-      {
-        cols: 80,
-        rows: 5,
-      }
+      { windowsHide: true }
     );
 
     let output = '';
-    child.onData((data: string) => {
-      output += data;
-    });
-
-    child.onExit(() => {
+    child.stdout.on('data', (data: Buffer) => { output += data.toString(); });
+    child.stderr.on('data', (data: Buffer) => { output += data.toString(); });
+    child.on('exit', () => {
       if (output.includes('NOT_FOUND')) {
         showHelp(`Command '${checkTarget}' not found. Install it first or check your PATH.`);
         onExit(terminalId, 1);
@@ -102,33 +127,25 @@ function spawnCheckTerminal(
         showHelp(`Command '${checkTarget}' is available. Use command launcher to start it.`);
         onExit(terminalId, 0);
       }
+      terminals.delete(terminalId);
     });
   } catch {
     showHelp(`Unable to verify command '${checkTarget}'. It may not be installed.`);
     onExit(terminalId, 1);
   }
 
-  terminals.set(terminalId, null as unknown as IPty);
+  terminals.set(terminalId, { write() {}, resize() {}, kill() { terminals.delete(terminalId); } });
 }
 
 export function writeToTerminal(terminalId: string, data: string): void {
-  const pty = terminals.get(terminalId);
-  if (pty) {
-    pty.write(data);
-  }
+  terminals.get(terminalId)?.write(data);
 }
 
 export function resizeTerminal(terminalId: string, cols: number, rows: number): void {
-  const pty = terminals.get(terminalId);
-  if (pty) {
-    pty.resize(cols, rows);
-  }
+  terminals.get(terminalId)?.resize(cols, rows);
 }
 
 export function killTerminal(terminalId: string): void {
-  const pty = terminals.get(terminalId);
-  if (pty) {
-    pty.kill();
-    terminals.delete(terminalId);
-  }
+  terminals.get(terminalId)?.kill();
+  terminals.delete(terminalId);
 }
