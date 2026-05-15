@@ -1,160 +1,145 @@
 # AgentDeck Architecture
 
-## High-Level Architecture
+```mermaid
+flowchart TB
+  subgraph Access["Access Layer"]
+    Phone["Phone Control"]
+    Desktop["Desktop Dashboard"]
+    CLI["CLI"]
+    APIClients["Local API Clients"]
+  end
 
-```
-┌──────────────────────────────────────────────┐
-│              Electron Main Process           │
-│                                              │
-│  ┌─────────────┐  ┌───────────────────────┐  │
-│  │ Window Mgr  │  │    IPC Handlers       │  │
-│  └─────────────┘  └───────────┬───────────┘  │
-│                               │               │
-│  ┌────────────────────────────▼────────────┐  │
-│  │         Terminal Manager                │  │
-│  │  Map<terminalId, IPty>                  │  │
-│  │  - createTerminal(cwd, cmd)             │  │
-│  │  - writeToTerminal(id, data)            │  │
-│  │  - resizeTerminal(id, cols, rows)       │  │
-│  │  - killTerminal(id)                     │  │
-│  └─────────────────────────────────────────┘  │
-│                                               │
-│  ┌─────────────────────────────────────────┐  │
-│  │         Workspace Store                 │  │
-│  │  %APPDATA%/AgentDeck/workspaces.json    │  │
-│  └─────────────────────────────────────────┘  │
-└──────────────────────┬───────────────────────┘
-                       │ IPC (contextBridge)
-┌──────────────────────▼───────────────────────┐
-│              Preload Script                   │
-│  contextBridge.exposeInMainWorld(             │
-│    'electronAPI', {                           │
-│      terminal: { create, write, resize, kill, │
-│                  onData, onExit },           │
-│      workspace: { list, save, delete },       │
-│      fs: { selectDirectory, readPackageJson } │
-│    }                                          │
-│  )                                            │
-└──────────────────────┬───────────────────────┘
-                       │
-┌──────────────────────▼───────────────────────┐
-│              Renderer (React)                 │
-│                                               │
-│  App.tsx (page router)                        │
-│  ├── Welcome.tsx                              │
-│  ├── WorkspaceSelector.tsx                    │
-│  ├── Workspace.tsx                            │
-│  │   ├── Sidebar.tsx                          │
-│  │   ├── TerminalGrid.tsx                     │
-│  │   │   └── TerminalPane.tsx (xterm.js)     │
-│  │   └── CommandLauncher.tsx                  │
-│  └── Settings.tsx                             │
-└───────────────────────────────────────────────┘
-```
+  subgraph Core["AgentDeck Core"]
+    Daemon["Daemon / Background Service"]
+    HTTP["Local HTTP API"]
+    Sessions["Session Manager"]
+    Config["Project & Config Manager"]
+    Discovery["Discovery Engine"]
+  end
 
-## Terminal Data Flow
+  subgraph Adapters["Agent Adapter Registry"]
+    CodexCLI["Codex CLI"]
+    CodexApp["Codex App"]
+    Claude["Claude Code"]
+    OpenCode["OpenCode"]
+    GeminiCLI["Gemini CLI"]
+    OllamaRuntime["Ollama Runtime"]
+  end
 
-```
-User clicks "npm run dev"
-  │
-  ▼
-CommandLauncher calls onAddPane(newPane)
-  │
-  ▼
-WorkspaceView adds pane to state, TerminalGrid re-renders
-  │
-  ▼
-TerminalPane mounts, calls useTerminal.createTerminal(cwd, "npm run dev")
-  │
-  ▼
-[IPC invoke 'terminal:create']
-  │
-  ▼
-TerminalManager.createTerminal()
-  │ spawns node-pty at cwd with powershell -Command "npm run dev"
-  │ assigns randomUUID as terminalId
-  │
-  ▼
-Returns terminalId → TerminalPane stores it
-  │
-  ▼
-PTY stdout → ipcRenderer.on('terminal:data') → xterm.write(data)
-xterm.onData → ipcRenderer.invoke('terminal:write') → PTY.write(data)
-  │
-  ▼
-PTY exit → ipcRenderer.on('terminal:exit') → StatusBadge shows 'done' or 'error'
+  subgraph Providers["Provider Router"]
+    Ollama["Ollama Local"]
+    OpenRouter["OpenRouter"]
+    Custom["Custom OpenAI-Compatible"]
+    Anthropic["Anthropic"]
+    Gemini["Gemini"]
+  end
+
+  subgraph Storage["Execution & Storage Layer"]
+    Paths["Local Project Paths"]
+    Processes["Child Processes / Agent Sessions"]
+    Logs["Logs & Session History"]
+    Settings["Settings / Local Persistence"]
+  end
+
+  subgraph Outcomes["Outcomes"]
+    DiscoverTools["Discover installed tools"]
+    ConfigureProviders["Configure providers"]
+    LaunchSessions["Launch and resume sessions"]
+    GenerateConfigs["Generate Codex/OpenCode configs"]
+    ManageProjects["Manage projects across devices"]
+  end
+
+  Access --> Core
+  Core --> Adapters
+  Core --> Providers
+  Core --> Storage
+  Storage --> Outcomes
 ```
 
-## Workspace Persistence
+The architecture diagram is stored as Mermaid text so PRs stay reviewable. Generated PNGs should not be committed.
 
-```
-Save:                                          Load:
-Panels change → debounced save                 App opens
-  │                                              │
-  ▼                                              ▼
-ipc: 'workspace:save'                         ipc: 'workspace:list'
-  │                                              │
-  ▼                                              ▼
-workspace-store.ts                            workspace-store.ts
-readFile(workspaces.json)                     readFile(workspaces.json)
-merge/update workspace                        return sorted workspaces
-writeFile(workspaces.json)                      │
-                                                 ▼
-                                              Welcome.tsx displays list
-```
+AgentDeck follows an Ollama-inspired local architecture for agent orchestration. The goal is to make one command start a local control plane that can discover tools, configure providers, register projects, launch sessions, capture logs, and expose the same capabilities through a dashboard and HTTP API.
 
-## Key Design Decisions
+## Layer 1: Access Layer
 
-### JSON over SQLite
-- No native build dependencies beyond node-pty
-- Single file per workspace store — trivial to inspect and debug
-- Sufficient for expected MVP data volume (<100 panes)
-- Can migrate to SQLite if needed later
+The access layer is intentionally simple:
 
-### Plain Vite + Electron (no wrappers)
-- Simpler build tooling compared to electron-forge or electron-vite
-- Standard `npm run dev` → Vite + Electron concurrently
-- Build: `vite build` produces `dist/renderer/`, main/preload compiled by `tsc`
+- `agentdeck` CLI for daemon lifecycle, status, discovery, providers, projects, sessions, and dashboard opening.
+- Electron desktop app for a Windows-first cockpit experience.
+- Local dashboard served by the daemon after a production build.
+- Local HTTP API for future integrations and external tooling.
 
-### node-pty in Main Process
-- Required: node-pty is a native Node.js addon, cannot run in renderer
-- IPC bridge is minimal: terminalId + data strings
-- Resize events delegated from renderer to main
+All access paths converge on the same local daemon so behavior is consistent regardless of UI.
 
-### Missing Command Detection
-- `check:<command>` prefix triggers a lightweight `where`/`which` check
-- If found → "Command available, use launcher to start"
-- If missing → shows install instructions in terminal output
+## Layer 2: AgentDeck Core
 
-## Security Model
-- `contextIsolation: true` — renderer cannot access Node.js APIs directly
-- `nodeIntegration: false` — no require() in renderer
-- `sandbox: false` — required for node-pty (native module)
-- All commands are user-initiated via explicit button clicks
-- Content Security Policy in index.html restricts script sources
+The core service owns product state and orchestration responsibilities:
 
-## File Listing
+- Daemon initialization and health reporting.
+- Provider registry operations.
+- Agent adapter listing and discovery coordination.
+- Project registration with local path validation.
+- Session registry and process lifecycle operations.
+- OpenAI-compatible config generation for integrations.
+- Local persistence coordination.
 
-```
-src/main/index.ts               Electron app entry
-src/main/ipc-handlers.ts        All IPC handle registrations
-src/main/terminal-manager.ts    node-pty spawn/resize/kill + check logic
-src/main/workspace-store.ts     JSON file read/write
-src/preload/index.ts            contextBridge API surface
-src/renderer/index.tsx          ReactDOM entry
-src/renderer/App.tsx            Page router + state
-src/renderer/App.css            Global dark theme CSS
-src/renderer/types.ts           TypeScript interfaces
-src/renderer/vite-env.d.ts      Vite + Electron type augmentations
-src/renderer/hooks/useWorkspace.ts   Workspace CRUD hook
-src/renderer/hooks/useTerminal.ts    xterm.js lifecycle hook
-src/renderer/pages/Welcome.tsx       Welcome/landing screen
-src/renderer/pages/WorkspaceSelector.tsx  New workspace form
-src/renderer/pages/Workspace.tsx          Main workspace layout
-src/renderer/pages/Settings.tsx           Settings panel
-src/renderer/components/Sidebar.tsx        Left nav sidebar
-src/renderer/components/TerminalPane.tsx   Single xterm pane
-src/renderer/components/TerminalGrid.tsx   Multi-pane grid layout
-src/renderer/components/CommandLauncher.tsx Bottom command bar
-src/renderer/components/StatusBadge.tsx    Pane status indicator
-```
+The core is separate from the HTTP server so a future Windows service wrapper can reuse it without duplicating business logic.
+
+## Layer 3: Agent Adapter Registry
+
+Adapters define how AgentDeck understands external tools. The current registry includes:
+
+- Codex CLI
+- Codex App
+- Claude Code
+- OpenCode
+- Gemini CLI
+- Ollama Runtime
+
+Each adapter has an id, display name, executable candidates, supported platforms, docs URL, detection command, config locations, and launch argument template. Discovery checks PATH with `where` on Windows and `which` on Unix-like systems, then runs a version command when available.
+
+## Layer 4: Provider Router
+
+The provider router normalizes metadata for model/runtime providers:
+
+- Ollama Local: `http://localhost:11434/v1`
+- OpenRouter: `https://openrouter.ai/api/v1`
+- Custom OpenAI-compatible endpoint
+- Anthropic placeholder
+- Gemini placeholder
+
+Provider records store environment variable names such as `OPENROUTER_API_KEY`, not raw secret values.
+
+## Layer 5: Execution & Storage Layer
+
+Execution is deliberately constrained for safety:
+
+- Only known adapters can be launched.
+- Launches use `spawn` with `shell: false`.
+- Project paths must exist and be directories.
+- stdout/stderr streams are captured to per-session log files.
+- Store and logs live in OS-appropriate app-data directories.
+- External integration configs are backed up before writes.
+
+## Layer 6: Outcomes
+
+AgentDeck's architecture enables the user to:
+
+- Discover installed agent tools.
+- Configure local and hosted providers.
+- Register projects.
+- Create and launch sessions.
+- Capture and review logs.
+- Generate Codex/OpenCode OpenAI-compatible config snippets safely.
+
+## Why this architecture
+
+Agent orchestration needs a local control plane because agent tools, project paths, shells, logs, and model runtime credentials are machine-local concerns. The Ollama-style daemon/API/CLI pattern gives AgentDeck a small, predictable foundation that can later grow into a Windows service, tray app, richer PTY streaming, provider model sync, and optional team/cloud sync without replacing the local-first core.
+
+## Current local API surface
+
+The daemon exposes health/status, provider CRUD and tests, project CRUD, session lifecycle/logs, discovery cache/refresh, settings export/reset, and integration config preview/write endpoints. The HTTP layer delegates business logic to `AgentDeckCore`, keeping the future Windows service path clear.
+
+## Phone-to-desktop control layer
+
+The daemon now includes an explicit remote-access layer. Localhost clients keep the regular dashboard/CLI flow, while LAN clients must pair through `/api/remote/pair` and then present a bearer token for protected APIs. The `/phone` route is a mobile-first UI that consumes safe daemon endpoints without exposing raw secrets or desktop-only destructive actions.

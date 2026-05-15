@@ -50,3 +50,114 @@ declare global {
     electronAPI: ElectronAPI;
   }
 }
+
+export interface DaemonHealth {
+  status: 'ok';
+  version: string;
+  platform: string;
+  uptime: number;
+  dataDir: string;
+  providersCount: number;
+  projectsCount: number;
+  sessionsCount: number;
+  detectedAgentsCount: number;
+  ptyAvailable?: boolean;
+}
+
+export interface ProviderConfigView {
+  id: string;
+  name: string;
+  type: string;
+  baseUrl: string;
+  apiKeyEnvVar?: string;
+  isDefault?: boolean;
+  availableModels: string[];
+  defaultModel?: string;
+  modelsLastRefreshedAt?: string;
+  supportsOpenAICompatibleApi: boolean;
+  status: string;
+  updatedAt: string;
+}
+
+export interface AgentAdapterView {
+  id: string;
+  displayName: string;
+  executableNames: string[];
+  supportedPlatforms: string[];
+  configLocations: string[];
+  launchCommandTemplate: string;
+  detectionCommand: string;
+  docsUrl: string;
+  status: string;
+  installHint?: string;
+}
+
+export interface ProjectView {
+  id: string;
+  name: string;
+  path: string;
+  notes?: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+  lastOpenedAt?: string;
+  sessionsCount?: number;
+  pathStatus?: string;
+}
+
+export interface SessionView {
+  id: string;
+  projectId: string;
+  agentId: string;
+  providerId: string;
+  model: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  lastStartedAt?: string;
+  command: string;
+  cwd: string;
+  logsPath: string;
+  mode?: 'process' | 'pty';
+  pid?: number;
+  processId?: number;
+  startedAt?: string;
+  stoppedAt?: string;
+  terminalCols?: number;
+  terminalRows?: number;
+  lastOutputAt?: string;
+  exitCode?: number | null;
+  error?: string;
+  logsTail?: string;
+}
+
+export interface DiscoveryView {
+  id: string;
+  name: string;
+  adapterId?: string;
+  displayName: string;
+  executable?: string;
+  path?: string;
+  version?: string;
+  status: string;
+  installHint: string;
+  docsUrl: string;
+  lastCheckedAt: string;
+}
+
+
+export interface RemoteAccessView {
+  enabled: boolean;
+  localOnly: boolean;
+  bindHost: string;
+  port: number;
+  lanUrls: string[];
+  selectedLanUrl?: string;
+  pairedDevicesCount: number;
+  pairedDevices: Array<{ id: string; name: string; pairedAt: string; lastSeenAt?: string; expiresAt: string; revokedAt?: string }>;
+  lastPhoneAccessAt?: string;
+  warnings: string[];
+  qrPayload?: string;
+  pairingToken?: string;
+  phoneUrl?: string;
+}
