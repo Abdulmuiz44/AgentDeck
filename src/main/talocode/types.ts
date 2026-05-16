@@ -177,7 +177,7 @@ export interface DiscoveryCache {
   lastCheckedAt?: string;
 }
 
-export interface AgentDeckStore {
+export interface TalocodeStore {
   providers: ProviderConfig[];
   projects: ProjectRegistration[];
   sessions: AgentSession[];

@@ -1,10 +1,10 @@
 import { mkdir, readFile, rename, writeFile } from 'fs/promises';
-import { dirname } from 'path';
-import type { AgentDeckStore } from './types';
-import { DEFAULT_HOST, DEFAULT_PORT, getStorePath } from './paths';
+import { dirname, resolve } from 'path';
+import type { TalocodeStore } from './types';
+import { DEFAULT_HOST, DEFAULT_PORT, getStorePath, prepareDataDirMigration } from './paths';
 import { defaultProviders } from './providers';
 
-export function defaultStore(): AgentDeckStore {
+export function defaultStore(): TalocodeStore {
   return {
     providers: defaultProviders(),
     projects: [],
@@ -30,14 +30,15 @@ export class JsonStore {
   constructor(private readonly storePath = getStorePath()) {}
 
   async ensure(): Promise<void> {
+    if (resolve(this.storePath) === resolve(getStorePath())) prepareDataDirMigration();
     await mkdir(dirname(this.storePath), { recursive: true });
   }
 
-  async read(): Promise<AgentDeckStore> {
+  async read(): Promise<TalocodeStore> {
     await this.ensure();
     try {
       const raw = await readFile(this.storePath, 'utf-8');
-      const parsed = JSON.parse(raw) as Partial<AgentDeckStore>;
+      const parsed = JSON.parse(raw) as Partial<TalocodeStore>;
       const defaults = defaultStore();
       return {
         providers: parsed.providers?.length ? parsed.providers : defaults.providers,
@@ -63,14 +64,14 @@ export class JsonStore {
     }
   }
 
-  async write(store: AgentDeckStore): Promise<void> {
+  async write(store: TalocodeStore): Promise<void> {
     await this.ensure();
     const tmp = `${this.storePath}.tmp`;
     await writeFile(tmp, JSON.stringify(store, null, 2), 'utf-8');
     await rename(tmp, this.storePath);
   }
 
-  async update(mutator: (store: AgentDeckStore) => void | Promise<void>): Promise<AgentDeckStore> {
+  async update(mutator: (store: TalocodeStore) => void | Promise<void>): Promise<TalocodeStore> {
     const store = await this.read();
     await mutator(store);
     await this.write(store);

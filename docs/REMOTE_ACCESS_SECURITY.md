@@ -2,7 +2,7 @@
 
 ## Implemented now
 
-AgentDeck remote access is explicit opt-in. By default the daemon remains localhost-only and unauthenticated LAN clients cannot call protected API routes.
+Talocode remote access is explicit opt-in. By default the daemon remains localhost-only and unauthenticated LAN clients cannot call protected API routes.
 
 Security behavior:
 
@@ -41,3 +41,7 @@ Enable Phone Control only on trusted networks. Disable it when finished on share
 ## Next phase
 
 Add native QR rendering, audit logs, per-device permissions, shorter pairing-token TTLs, origin allow-list enforcement, and optional cloud relay with account-based authorization for off-LAN control.
+
+## Migration from AgentDeck
+
+Talocode started as the AgentDeck prototype. The project has moved to the Talocode brand and repository at https://github.com/talocode/talocode.

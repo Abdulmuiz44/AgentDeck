@@ -1,6 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 import { randomUUID } from 'crypto';
-import { spawnPty, type PtyProcess } from './agentdeck/pty-adapter';
+import { spawnPty, type PtyProcess } from './talocode/pty-adapter';
 
 interface TerminalProcess {
   write(data: string): void;
@@ -61,7 +61,7 @@ export function createTerminal(
     return terminalId;
   }
 
-  onData(terminalId, '\r\n[AgentDeck] node-pty is unavailable; using process-mode terminal fallback. Interactive behavior may be limited.\r\n');
+  onData(terminalId, '\r\n[Talocode] node-pty is unavailable; using process-mode terminal fallback. Interactive behavior may be limited.\r\n');
   const child = spawn(shell, args, { cwd: options.cwd, env: options.env, shell: false, windowsHide: true });
   wireChild(terminalId, child, onData, onExit);
   return terminalId;
@@ -85,7 +85,7 @@ function wireChild(terminalId: string, child: ChildProcessWithoutNullStreams, on
   });
   child.on('error', (error) => {
     terminals.delete(terminalId);
-    onData(terminalId, `\r\n[AgentDeck] terminal failed: ${error.message}\r\n`);
+    onData(terminalId, `\r\n[Talocode] terminal failed: ${error.message}\r\n`);
     onExit(terminalId, 1);
   });
   terminals.set(terminalId, {

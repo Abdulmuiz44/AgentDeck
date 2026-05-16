@@ -2,7 +2,7 @@
 
 ## Implemented now
 
-AgentDeck stores provider metadata and API key **environment variable names** only. It never stores raw API key values.
+Talocode stores provider metadata and API key **environment variable names** only. It never stores raw API key values.
 
 Implemented provider behavior:
 
@@ -22,8 +22,8 @@ http://localhost:11434/v1
 Ollama does not require an API key by default. To test it:
 
 1. Start Ollama locally.
-2. Run `agentdeck providers test ollama`.
-3. AgentDeck calls the local Ollama tags endpoint and caches discovered model names when available.
+2. Run `talo providers test ollama`.
+3. Talocode calls the local Ollama tags endpoint and caches discovered model names when available.
 
 ## OpenRouter
 
@@ -33,7 +33,7 @@ Default base URL:
 https://openrouter.ai/api/v1
 ```
 
-Set the API key in the daemon environment before starting AgentDeck:
+Set the API key in the daemon environment before starting Talocode:
 
 ```powershell
 $env:OPENROUTER_API_KEY = "..."
@@ -43,8 +43,8 @@ node dist/cli/index.js start
 Then run:
 
 ```bash
-agentdeck providers add --type openrouter --name OpenRouter --apiKeyEnvVar OPENROUTER_API_KEY --model openai/gpt-4o-mini
-agentdeck providers test openrouter
+talo providers add --type openrouter --name OpenRouter --apiKeyEnvVar OPENROUTER_API_KEY --model openai/gpt-4o-mini
+talo providers test openrouter
 ```
 
 ## Custom OpenAI-Compatible
@@ -52,7 +52,7 @@ agentdeck providers test openrouter
 Provide a name, base URL, API key environment variable, and default model:
 
 ```bash
-agentdeck providers add --type openai-compatible --name LocalGateway --baseUrl http://localhost:8000/v1 --apiKeyEnvVar CUSTOM_OPENAI_API_KEY --model my-model
+talo providers add --type openai-compatible --name LocalGateway --baseUrl http://localhost:8000/v1 --apiKeyEnvVar CUSTOM_OPENAI_API_KEY --model my-model
 ```
 
 ## Model refresh
@@ -60,9 +60,9 @@ agentdeck providers add --type openai-compatible --name LocalGateway --baseUrl h
 Provider models can be refreshed from the dashboard Providers page or CLI:
 
 ```bash
-agentdeck providers models ollama
-agentdeck providers refresh-models ollama
-agentdeck providers refresh-models openrouter
+talo providers models ollama
+talo providers refresh-models ollama
+talo providers refresh-models openrouter
 ```
 
 ## Phone safety
@@ -74,3 +74,7 @@ Phone clients can view redacted provider metadata and refresh model lists where 
 - Native Anthropic/Gemini provider execution is not implemented yet.
 - Service-mode provider API keys must be set for the Windows service account/environment.
 - Provider compatibility recommendations are future work.
+
+## Migration from AgentDeck
+
+Talocode started as the AgentDeck prototype. The project has moved to the Talocode brand and repository at https://github.com/talocode/talocode.

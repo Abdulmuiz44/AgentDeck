@@ -41,7 +41,7 @@ export default function Welcome({ onNewWorkspace, onOpenWorkspace, onSettings }:
             marginBottom: 8,
           }}
         >
-          AgentDeck
+          Talocode
         </h1>
         <p
           style={{
@@ -51,8 +51,7 @@ export default function Welcome({ onNewWorkspace, onOpenWorkspace, onSettings }:
             lineHeight: 1.6,
           }}
         >
-          A Windows-first workspace for running AI coding agents, terminals, dev servers, and test
-          runners side by side.
+          Local-first control plane for coding agents. Run agents on your machine and control sessions, providers, logs, worktrees, and approvals from one cockpit.
         </p>
       </div>
 

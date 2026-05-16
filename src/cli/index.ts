@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { spawn } from 'child_process';
 import { resolve, join } from 'path';
-import { AgentDeckDaemon } from '../main/agentdeck/daemon-server';
-import { DEFAULT_HOST, DEFAULT_PORT } from '../main/agentdeck/paths';
+import { TalocodeDaemon } from '../main/talocode/daemon-server';
+import { DEFAULT_HOST, DEFAULT_PORT, envValue } from '../main/talocode/paths';
 import { runServiceCommand } from './service';
 
 type Json = Record<string, unknown>;
@@ -10,7 +10,7 @@ type Json = Record<string, unknown>;
 const args = process.argv.slice(2);
 const jsonMode = args.includes('--json');
 const cleanArgs = args.filter((arg) => arg !== '--json');
-const baseUrl = process.env.AGENTDECK_URL || `http://${process.env.AGENTDECK_HOST || DEFAULT_HOST}:${process.env.AGENTDECK_PORT || DEFAULT_PORT}`;
+const baseUrl = envValue('URL') || `http://${envValue('HOST') || DEFAULT_HOST}:${envValue('PORT') || DEFAULT_PORT}`;
 
 async function main(): Promise<void> {
   const [command, subcommand, ...rest] = cleanArgs;
@@ -34,14 +34,14 @@ async function main(): Promise<void> {
         return output(await runServiceCommand(subcommand));
       case 'open':
         openUrl(baseUrl);
-        console.log(`Opening AgentDeck dashboard at ${baseUrl}`);
+        console.log(`Opening Talocode dashboard at ${baseUrl}`);
         return;
       default:
         usage();
     }
   } catch (error) {
     if (error instanceof Error && error.message.includes('fetch failed')) {
-      console.error(`AgentDeck daemon is not reachable at ${baseUrl}. Run "agentdeck start" first.`);
+      console.error(`Talocode daemon is not reachable at ${baseUrl}. Run "talo start" first.`);
       process.exitCode = 1;
       return;
     }
@@ -61,7 +61,7 @@ async function handleRemote(subcommand = 'status', rest: string[]): Promise<void
   if (subcommand === 'rotate-token') return output(await api('/api/remote/access/rotate-token', { method: 'POST' }));
   if (subcommand === 'qr') {
     const status = await api('/api/remote/access') as { qrPayload?: string; selectedLanUrl?: string };
-    console.log(status.qrPayload || (status.selectedLanUrl ? `${status.selectedLanUrl}/phone` : 'Phone access is disabled. Run agentdeck remote enable first.'));
+    console.log(status.qrPayload || (status.selectedLanUrl ? `${status.selectedLanUrl}/phone` : 'Phone access is disabled. Run talo remote enable first.'));
     return;
   }
   if (subcommand === 'devices') {
@@ -104,7 +104,7 @@ async function handleSessions(subcommand = 'list', rest: string[]): Promise<void
 
 async function startDaemon(): Promise<void> {
   const staticDir = join(__dirname, '..', 'renderer');
-  const daemon = new AgentDeckDaemon({ staticDir });
+  const daemon = new TalocodeDaemon({ staticDir });
   await daemon.start();
   console.log('Press Ctrl+C to stop.');
   const stop = async () => {
@@ -194,26 +194,29 @@ function openUrl(url: string): void {
 }
 
 function usage(): never {
-  console.log(`AgentDeck CLI
+  console.log(`Talocode CLI
 
 Commands:
-  agentdeck start
-  agentdeck status [--json]
-  agentdeck discover [--json]
-  agentdeck remote status|enable|disable|rotate-token|qr|devices|revoke <device-id> [--json]
-  agentdeck providers list [--json]
-  agentdeck providers add --type ollama|openrouter|openai-compatible [--name NAME] [--baseUrl URL] [--apiKeyEnvVar ENV] [--model MODEL] [--default]
-  agentdeck providers test <id>
-  agentdeck providers models <id>
-  agentdeck providers refresh-models <id>
-  agentdeck projects list [--json]
-  agentdeck projects add <path> [--description TEXT]
-  agentdeck sessions list [--json]
-  agentdeck sessions create --projectId ID --agentId ID --providerId ID [--model MODEL] [--mode pty|process] [--start]
-  agentdeck sessions start <id>
-  agentdeck sessions stop <id>
-  agentdeck sessions restart <id>
-  agentdeck open`);
+  talo start
+  talo status [--json]
+  talo discover [--json]
+  talo remote status|enable|disable|rotate-token|qr|devices|revoke <device-id> [--json]
+  talo providers list [--json]
+  talo providers add --type ollama|openrouter|openai-compatible [--name NAME] [--baseUrl URL] [--apiKeyEnvVar ENV] [--model MODEL] [--default]
+  talo providers test <id>
+  talo providers models <id>
+  talo providers refresh-models <id>
+  talo projects list [--json]
+  talo projects add <path> [--description TEXT]
+  talo sessions list [--json]
+  talo sessions create --projectId ID --agentId ID --providerId ID [--model MODEL] [--mode pty|process] [--start]
+  talo sessions start <id>
+  talo sessions stop <id>
+  talo sessions restart <id>
+  talo open
+
+Compatibility alias:
+  agentdeck remains temporarily available and maps to the same CLI entrypoint.`);
   process.exit(0);
 }
 

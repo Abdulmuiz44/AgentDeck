@@ -4,7 +4,7 @@
 
 The Electron app creates a tray menu when the platform/runtime supports it. Actions include:
 
-- Open AgentDeck
+- Open Talocode
 - Start daemon
 - Stop daemon
 - Restart daemon
@@ -16,7 +16,7 @@ The tray uses an empty icon fallback so a missing packaged icon does not crash s
 
 ## Partial/fallback behavior
 
-- If tray creation fails, AgentDeck logs a warning and continues running the window/daemon.
+- If tray creation fails, Talocode logs a warning and continues running the window/daemon.
 - Menu state refreshes after menu actions; it does not continuously poll daemon health yet.
 - If a CLI daemon is already using the port, Electron logs the daemon startup failure and still opens the desktop window.
 
@@ -29,3 +29,7 @@ The tray uses an empty icon fallback so a missing packaged icon does not crash s
 ## Next phase
 
 Add packaged icon assets, live health polling, service integration, and clearer duplicate-daemon messaging.
+
+## Migration from AgentDeck
+
+Talocode started as the AgentDeck prototype. The project has moved to the Talocode brand and repository at https://github.com/talocode/talocode.
