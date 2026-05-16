@@ -3,7 +3,7 @@ import { getStorePath } from './paths';
 import { agentAdapters } from './agents';
 import { generateOpenAICompatibleConfig, writeOpenAICompatibleConfig } from './config-generator';
 import { discoverTools } from './discovery';
-import { DEFAULT_HOST, DEFAULT_PORT, getDataDir } from './paths';
+import { DEFAULT_HOST, DEFAULT_PORT, envValue, getDataDir } from './paths';
 import { JsonStore } from './persistence';
 import { isPtyAvailable } from './pty-adapter';
 import { normalizeProvider, redactProvider } from './providers';
@@ -88,7 +88,7 @@ export interface ConfigureIntegrationRequest {
 const started = Date.now();
 const version = process.env.npm_package_version || '0.1.0';
 
-export class AgentDeckCore {
+export class TalocodeCore {
   private lastError: string | undefined;
 
   constructor(private readonly store = new JsonStore()) {}
@@ -125,7 +125,7 @@ export class AgentDeckCore {
     };
   }
 
-  async status(localApiUrl = `http://${process.env.AGENTDECK_HOST || DEFAULT_HOST}:${process.env.AGENTDECK_PORT || DEFAULT_PORT}`): Promise<DaemonStatus> {
+  async status(localApiUrl = `http://${envValue('HOST') || DEFAULT_HOST}:${envValue('PORT') || DEFAULT_PORT}`): Promise<DaemonStatus> {
     const data = await this.store.read();
     const tools = data.discoveryCache?.tools || [];
     const activeSessions = activeSessionIds().length;
@@ -181,7 +181,7 @@ export class AgentDeckCore {
     let provider: ProviderConfig | undefined;
     await this.store.update((data) => {
       provider = data.providers.find((item) => item.id === id);
-      if (!provider) throw new AgentDeckError(404, 'Provider not found');
+      if (!provider) throw new TalocodeError(404, 'Provider not found');
       data.settings.defaultProviderId = id;
       data.providers.forEach((item) => { item.isDefault = item.id === id; });
     });
@@ -191,7 +191,7 @@ export class AgentDeckCore {
   async testProvider(id: string): Promise<ProviderTestResult> {
     const data = await this.store.read();
     const provider = data.providers.find((item) => item.id === id);
-    if (!provider) throw new AgentDeckError(404, 'Provider not found');
+    if (!provider) throw new TalocodeError(404, 'Provider not found');
     const checkedAt = new Date().toISOString();
     try {
       if (provider.type === 'ollama') {
@@ -227,7 +227,7 @@ export class AgentDeckCore {
   async getProviderModels(id: string): Promise<{ providerId: string; models: string[]; defaultModel?: string; modelsLastRefreshedAt?: string }> {
     const data = await this.store.read();
     const provider = data.providers.find((item) => item.id === id);
-    if (!provider) throw new AgentDeckError(404, 'Provider not found');
+    if (!provider) throw new TalocodeError(404, 'Provider not found');
     return { providerId: id, models: provider.availableModels, defaultModel: provider.defaultModel, modelsLastRefreshedAt: provider.modelsLastRefreshedAt };
   }
 
@@ -251,7 +251,7 @@ export class AgentDeckCore {
   async getProject(id: string): Promise<ProjectRegistration & { sessions: AgentSession[] }> {
     const data = await this.store.read();
     const project = data.projects.find((item) => item.id === id);
-    if (!project) throw new AgentDeckError(404, 'Project not found');
+    if (!project) throw new TalocodeError(404, 'Project not found');
     return { ...(await this.decorateProject(project, data.sessions)), sessions: data.sessions.filter((session) => session.projectId === id) };
   }
 
@@ -286,7 +286,7 @@ export class AgentDeckCore {
   async getSession(id: string): Promise<AgentSession & { logsTail: string }> {
     const data = await this.store.read();
     const session = data.sessions.find((item) => item.id === id);
-    if (!session) throw new AgentDeckError(404, 'Session not found');
+    if (!session) throw new TalocodeError(404, 'Session not found');
     const logs = await readSessionLogs(this.store, id, 8000);
     return { ...session, logsTail: logs.text };
   }
@@ -313,7 +313,7 @@ export class AgentDeckCore {
   }
 
   async resizeSession(id: string, cols: number, rows: number): Promise<{ resized: boolean; cols: number; rows: number }> {
-    if (!Number.isFinite(cols) || !Number.isFinite(rows) || cols < 20 || rows < 5) throw new AgentDeckError(400, 'Invalid terminal size');
+    if (!Number.isFinite(cols) || !Number.isFinite(rows) || cols < 20 || rows < 5) throw new TalocodeError(400, 'Invalid terminal size');
     return resizeSession(this.store, id, Math.floor(cols), Math.floor(rows));
   }
 
@@ -424,7 +424,7 @@ export class AgentDeckCore {
 
   async rotateRemoteToken(port = DEFAULT_PORT, currentBindHost?: string): Promise<RemoteAccessTokenResponse> {
     const data = await this.store.read();
-    if (!data.settings.remoteAccess.phoneAccessEnabled) throw new AgentDeckError(400, 'Phone access is not enabled');
+    if (!data.settings.remoteAccess.phoneAccessEnabled) throw new TalocodeError(400, 'Phone access is not enabled');
     return this.enableRemoteAccess(port, { publicLanUrl: data.settings.remoteAccess.publicLanUrl, bindHost: data.settings.remoteAccess.bindHost }, currentBindHost);
   }
 
@@ -437,8 +437,8 @@ export class AgentDeckCore {
     let paired: PhonePairingResponse['device'] | undefined;
     await this.store.update((data) => {
       const remote = data.settings.remoteAccess;
-      if (!remote.phoneAccessEnabled) throw new AgentDeckError(403, 'Phone access is disabled');
-      if (!verifyToken(token, remote.pairingTokenHash)) throw new AgentDeckError(401, 'Invalid or expired pairing token');
+      if (!remote.phoneAccessEnabled) throw new TalocodeError(403, 'Phone access is disabled');
+      if (!verifyToken(token, remote.pairingTokenHash)) throw new TalocodeError(401, 'Invalid or expired pairing token');
       const device = {
         id: deviceId,
         name: deviceName || 'Phone browser',
@@ -491,7 +491,7 @@ export class AgentDeckCore {
         revoked = true;
       }
     });
-    if (!revoked) throw new AgentDeckError(404, 'Paired device not found');
+    if (!revoked) throw new TalocodeError(404, 'Paired device not found');
     return { revoked };
   }
 
@@ -519,8 +519,8 @@ export class AgentDeckCore {
   private async providerForIntegration(request: ConfigureIntegrationRequest): Promise<ProviderConfig> {
     const data = await this.store.read();
     const provider = data.providers.find((item) => item.id === request.providerId) || data.providers.find((item) => item.id === request.provider);
-    if (!provider) throw new AgentDeckError(404, 'Provider not found');
-    if (!provider.supportsOpenAICompatibleApi) throw new AgentDeckError(400, 'Provider does not support OpenAI-compatible configuration');
+    if (!provider) throw new TalocodeError(404, 'Provider not found');
+    if (!provider.supportsOpenAICompatibleApi) throw new TalocodeError(400, 'Provider does not support OpenAI-compatible configuration');
     return provider;
   }
 
@@ -545,14 +545,14 @@ export class AgentDeckCore {
   }
 }
 
-export class AgentDeckError extends Error {
+export class TalocodeError extends Error {
   constructor(public readonly status: number, message: string) {
     super(message);
   }
 }
 
 export function asObject(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new AgentDeckError(400, 'Request body must be a JSON object');
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TalocodeError(400, 'Request body must be a JSON object');
   return value as Record<string, unknown>;
 }
 
@@ -641,7 +641,7 @@ function optionalString(value: unknown, field: string): string | undefined {
 }
 
 function requiredNumber(value: unknown, field: string): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) throw new AgentDeckError(400, `${field} must be a number`);
+  if (typeof value !== 'number' || !Number.isFinite(value)) throw new TalocodeError(400, `${field} must be a number`);
   return value;
 }
 
@@ -652,18 +652,18 @@ function optionalNumber(value: unknown, field: string): number | undefined {
 
 function optionalBoolean(value: unknown, field: string): boolean | undefined {
   if (value === undefined || value === null) return undefined;
-  if (typeof value !== 'boolean') throw new AgentDeckError(400, `${field} must be a boolean`);
+  if (typeof value !== 'boolean') throw new TalocodeError(400, `${field} must be a boolean`);
   return value;
 }
 
 function optionalStringArray(value: unknown, field: string): string[] | undefined {
   if (value === undefined || value === null) return undefined;
-  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) throw new AgentDeckError(400, `${field} must be an array of strings`);
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) throw new TalocodeError(400, `${field} must be an array of strings`);
   return value;
 }
 
 function assertString(value: unknown, field: string): asserts value is string {
-  if (typeof value !== 'string' || !value.trim()) throw new AgentDeckError(400, `${field} is required`);
+  if (typeof value !== 'string' || !value.trim()) throw new TalocodeError(400, `${field} is required`);
 }
 
 function redact(input: string): string {

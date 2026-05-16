@@ -3,11 +3,11 @@ import { promisify } from 'util';
 import { resolve } from 'path';
 
 const execFileAsync = promisify(execFile);
-const SERVICE_NAME = 'AgentDeck';
+const SERVICE_NAME = 'Talocode';
 
 export async function runServiceCommand(action: string | undefined): Promise<unknown> {
   if (process.platform !== 'win32') {
-    return { ok: false, supported: false, message: 'AgentDeck Windows service commands are only supported on Windows.' };
+    return { ok: false, supported: false, message: 'Talocode Windows service commands are only supported on Windows.' };
   }
   switch (action) {
     case 'install': return installService();
@@ -15,7 +15,7 @@ export async function runServiceCommand(action: string | undefined): Promise<unk
     case 'start': return sc(['start', SERVICE_NAME]);
     case 'stop': return sc(['stop', SERVICE_NAME]);
     case 'status': return sc(['query', SERVICE_NAME]);
-    default: return { ok: false, message: 'Usage: agentdeck service install|uninstall|start|stop|status' };
+    default: return { ok: false, message: 'Usage: talo service install|uninstall|start|stop|status' };
   }
 }
 
@@ -23,7 +23,7 @@ async function installService(): Promise<unknown> {
   const node = process.execPath;
   const cli = resolve(__dirname, 'index.js');
   const binPath = `\"${node}\" \"${cli}\" start`;
-  return sc(['create', SERVICE_NAME, `binPath=`, binPath, 'start=', 'auto', 'DisplayName=', 'AgentDeck']);
+  return sc(['create', SERVICE_NAME, `binPath=`, binPath, 'start=', 'auto', 'DisplayName=', 'Talocode']);
 }
 
 async function sc(args: string[]): Promise<unknown> {

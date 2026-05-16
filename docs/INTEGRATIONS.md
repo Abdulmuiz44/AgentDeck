@@ -1,6 +1,6 @@
 # Integrations
 
-AgentDeck integrates with tools through adapter metadata, PATH discovery, and generated OpenAI-compatible config snippets.
+Talocode integrates with tools through adapter metadata, PATH discovery, and generated OpenAI-compatible config snippets.
 
 ## Supported adapters
 
@@ -21,7 +21,7 @@ Default OpenAI-compatible base URL:
 http://localhost:11434/v1
 ```
 
-Ollama is treated as a local provider/runtime. AgentDeck does not store raw secrets; it can pass an environment variable name such as `OLLAMA_API_KEY` to tools that require one.
+Ollama is treated as a local provider/runtime. Talocode does not store raw secrets; it can pass an environment variable name such as `OLLAMA_API_KEY` to tools that require one.
 
 ## OpenRouter
 
@@ -39,11 +39,11 @@ OPENROUTER_API_KEY
 
 ## Custom OpenAI-compatible providers
 
-Custom providers can be registered with a name, base URL, default model, and API key environment variable reference. AgentDeck stores the environment variable name, not the value.
+Custom providers can be registered with a name, base URL, default model, and API key environment variable reference. Talocode stores the environment variable name, not the value.
 
 ## Codex config generation
 
-`POST /api/integrations/codex/configure` returns a TOML snippet that defines an AgentDeck model provider and profile. Dry run is default.
+`POST /api/integrations/codex/configure` returns a TOML snippet that defines an Talocode model provider and profile. Dry run is default.
 
 ## OpenCode config generation
 
@@ -51,14 +51,14 @@ Custom providers can be registered with a name, base URL, default model, and API
 
 ## Safe writes
 
-When `dryRun` is `false`, AgentDeck:
+When `dryRun` is `false`, Talocode:
 
 1. Creates parent directories if needed.
-2. Backs up an existing config to `*.agentdeck-backup-<timestamp>`.
+2. Backs up an existing config to `*.talocode-backup-<timestamp>`.
 3. Writes the generated config.
 4. Records the integration action in local persistence.
 
-Raw API keys are never written by AgentDeck; only environment variable references are used.
+Raw API keys are never written by Talocode; only environment variable references are used.
 
 ## Preview and write endpoints
 
@@ -68,3 +68,7 @@ New generic integration endpoints:
 - `POST /api/integrations/config/write`
 
 Request fields include `targetTool`, `providerId`, `model`, optional `baseUrl`, optional `apiKeyEnvVar`, and optional `targetConfigPath`. Preview is dry-run only; write creates a backup first when a file already exists.
+
+## Migration from AgentDeck
+
+Talocode started as the AgentDeck prototype. The project has moved to the Talocode brand and repository at https://github.com/talocode/talocode.

@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { AgentDeckCore, AgentDeckError } from '../main/agentdeck/core';
-import { JsonStore } from '../main/agentdeck/persistence';
-import { buildLanUrls, getLanAddressCandidates, hashToken, redactSensitive, verifyToken } from '../main/agentdeck/remote';
+import { TalocodeCore, TalocodeError } from '../main/talocode/core';
+import { JsonStore } from '../main/talocode/persistence';
+import { buildLanUrls, getLanAddressCandidates, hashToken, redactSensitive, verifyToken } from '../main/talocode/remote';
 import type { NetworkInterfaceInfo } from 'os';
 
 test('LAN IP detection excludes loopback and prefers Wi-Fi/Ethernet IPv4', () => {
@@ -30,9 +30,9 @@ test('token hashing verifies with constant-time compatible hashes and redaction 
 });
 
 test('phone access enable, pair, auth, revoke, and disable flow is stored safely', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'agentdeck-remote-'));
+  const dir = await mkdtemp(join(tmpdir(), 'talocode-remote-'));
   try {
-    const core = new AgentDeckCore(new JsonStore(join(dir, 'agentdeck.json')));
+    const core = new TalocodeCore(new JsonStore(join(dir, 'talocode.json')));
     await core.initialize();
     const initial = await core.getRemoteAccess(3768, '127.0.0.1');
     assert.equal(initial.enabled, false);
@@ -41,7 +41,7 @@ test('phone access enable, pair, auth, revoke, and disable flow is stored safely
     assert.equal(enabled.enabled, true);
     assert.equal(enabled.phoneUrl, `http://192.168.1.20:3768/phone?pair=${enabled.pairingToken}`);
 
-    const pair = await core.pairPhone(enabled.pairingToken, 'Android Chrome', 'agentdeck-test token=secret');
+    const pair = await core.pairPhone(enabled.pairingToken, 'Android Chrome', 'talocode-test token=secret');
     assert.ok(pair.accessToken);
     assert.equal(pair.device.name, 'Android Chrome');
     assert.ok(!JSON.stringify(pair.device).includes('accessTokenHash'));
@@ -51,7 +51,7 @@ test('phone access enable, pair, auth, revoke, and disable flow is stored safely
     await core.revokePhoneDevice(pair.deviceId);
     assert.equal(await core.authenticatePhone(pair.accessToken), undefined);
 
-    await assert.rejects(() => core.pairPhone('wrong'), AgentDeckError);
+    await assert.rejects(() => core.pairPhone('wrong'), TalocodeError);
     await core.disableRemoteAccess();
     const disabled = await core.getRemoteAccess(3768, '127.0.0.1');
     assert.equal(disabled.enabled, false);
@@ -62,7 +62,7 @@ test('phone access enable, pair, auth, revoke, and disable flow is stored safely
 });
 
 test('remote guard blocks unsafe phone APIs', async () => {
-  const { isRemoteBlocked } = await import('../main/agentdeck/daemon-server');
+  const { isRemoteBlocked } = await import('../main/talocode/daemon-server');
   assert.equal(isRemoteBlocked('/api/integrations/config/write', 'POST'), true);
   assert.equal(isRemoteBlocked('/api/settings/reset', 'POST'), true);
   assert.equal(isRemoteBlocked('/api/providers', 'POST'), true);

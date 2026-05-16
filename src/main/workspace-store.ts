@@ -4,12 +4,12 @@ import { join } from 'path';
 import type { Workspace } from '../renderer/types';
 
 function getStorePath(): string {
-  const dataDir = join(app.getPath('appData'), 'AgentDeck');
+  const dataDir = join(app.getPath('appData'), 'Talocode');
   return join(dataDir, 'workspaces.json');
 }
 
 async function ensureDataDir(): Promise<void> {
-  const dataDir = join(app.getPath('appData'), 'AgentDeck');
+  const dataDir = join(app.getPath('appData'), 'Talocode');
   await mkdir(dataDir, { recursive: true });
 }
 

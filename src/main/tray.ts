@@ -1,19 +1,19 @@
 import { app, Menu, nativeImage, shell, Tray, BrowserWindow } from 'electron';
-import { getDataDir, getLogsDir } from './agentdeck/paths';
-import type { AgentDeckDaemon } from './agentdeck/daemon-server';
+import { getDataDir, getLogsDir } from './talocode/paths';
+import type { TalocodeDaemon } from './talocode/daemon-server';
 
 let tray: any = null;
 
-export function createAgentDeckTray(getDaemon: () => AgentDeckDaemon | null, controls: { start(): Promise<void>; stop(): Promise<void>; restart(): Promise<void>; openWindow(): void }): void {
+export function createTalocodeTray(getDaemon: () => TalocodeDaemon | null, controls: { start(): Promise<void>; stop(): Promise<void>; restart(): Promise<void>; openWindow(): void }): void {
   try {
     const image = nativeImage.createEmpty();
     tray = new Tray(image);
-    tray.setToolTip('AgentDeck');
+    tray.setToolTip('Talocode');
     const refresh = () => {
       const daemon = getDaemon();
       const running = Boolean(daemon);
       tray?.setContextMenu(Menu.buildFromTemplate([
-        { label: 'Open AgentDeck', click: controls.openWindow },
+        { label: 'Open Talocode', click: controls.openWindow },
         { label: running ? 'Daemon running' : 'Daemon stopped', enabled: false },
         { label: 'Start daemon', enabled: !running, click: () => void controls.start() },
         { label: 'Stop daemon', enabled: running, click: () => void controls.stop().then(refresh) },
@@ -32,11 +32,11 @@ export function createAgentDeckTray(getDaemon: () => AgentDeckDaemon | null, con
     });
     refresh();
   } catch (error) {
-    console.warn('AgentDeck tray unavailable:', error);
+    console.warn('Talocode tray unavailable:', error);
   }
 }
 
-export function destroyAgentDeckTray(): void {
+export function destroyTalocodeTray(): void {
   tray?.destroy();
   tray = null;
 }

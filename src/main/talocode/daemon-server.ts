@@ -4,8 +4,8 @@ import { stat } from 'fs/promises';
 import { extname, join, normalize } from 'path';
 import type { AddressInfo } from 'net';
 import {
-  AgentDeckCore,
-  AgentDeckError,
+  TalocodeCore,
+  TalocodeError,
   parseIntegrationRequest,
   parseProjectPatchRequest,
   parseProjectRequest,
@@ -14,51 +14,51 @@ import {
   parseSessionRequest,
   parseSessionResizeRequest,
 } from './core';
-import { DEFAULT_HOST, DEFAULT_PORT } from './paths';
+import { DEFAULT_HOST, DEFAULT_PORT, envValue } from './paths';
 import { bearerToken, isLocalRequest, redactSensitive } from './remote';
 import type { IntegrationTarget, SessionStatus, SessionStreamEvent } from './types';
 import { subscribeSessionEvents } from './session-events';
 
-export interface AgentDeckDaemonOptions {
+export interface TalocodeDaemonOptions {
   host?: string;
   port?: number;
   staticDir?: string;
-  core?: AgentDeckCore;
+  core?: TalocodeCore;
 }
 
-export class AgentDeckDaemon {
-  private readonly core: AgentDeckCore;
+export class TalocodeDaemon {
+  private readonly core: TalocodeCore;
   private host: string;
   private readonly port: number;
   private readonly staticDir?: string;
   private server = createServer((req, res) => void this.route(req, res));
 
-  constructor(options: AgentDeckDaemonOptions = {}) {
-    this.host = options.host || process.env.AGENTDECK_HOST || DEFAULT_HOST;
-    this.port = Number(options.port || process.env.AGENTDECK_PORT || DEFAULT_PORT);
+  constructor(options: TalocodeDaemonOptions = {}) {
+    this.host = options.host || envValue('HOST') || DEFAULT_HOST;
+    this.port = Number(options.port || envValue('PORT') || DEFAULT_PORT);
     this.staticDir = options.staticDir;
-    this.core = options.core || new AgentDeckCore();
+    this.core = options.core || new TalocodeCore();
   }
 
   async start(): Promise<void> {
-    console.log(`[AgentDeck] Preparing data directory and store...`);
+    console.log(`[Talocode] Preparing data directory and store...`);
     await this.core.initialize();
     const remote = await this.core.getRemoteAccess(this.port, this.host);
     if (remote.enabled && remote.bindHost) this.host = remote.bindHost;
     await new Promise<void>((resolve, reject) => {
       this.server.once('error', (error: NodeJS.ErrnoException) => {
-        if (error.code === 'EADDRINUSE') reject(new Error(`AgentDeck daemon port ${this.port} is already in use. Set AGENTDECK_PORT to use another port.`));
+        if (error.code === 'EADDRINUSE') reject(new Error(`Talocode daemon port ${this.port} is already in use. Set TALOCODE_PORT (or legacy AGENTDECK_PORT) to use another port.`));
         else reject(error);
       });
       this.server.listen(this.port, this.host, () => resolve());
     });
-    console.log(`[AgentDeck] Daemon listening at ${this.url()}`);
+    console.log(`[Talocode] Daemon listening at ${this.url()}`);
   }
 
   async stop(): Promise<void> {
     await this.core.shutdown();
     await new Promise<void>((resolve, reject) => this.server.close((error) => (error ? reject(error) : resolve())));
-    console.log('[AgentDeck] Daemon stopped cleanly.');
+    console.log('[Talocode] Daemon stopped cleanly.');
   }
 
   url(): string {
@@ -86,7 +86,7 @@ export class AgentDeckDaemon {
       if (req.method === 'POST' && path === '/api/remote/logout') return sendJson(res, 200, await this.core.logoutPhone(bearerToken(req)));
       if (req.method === 'GET' && path === '/api/remote/me') {
         if (localRequest) return sendJson(res, 200, { local: true });
-        if (!phoneDevice) throw new AgentDeckError(401, 'Phone authorization is required');
+        if (!phoneDevice) throw new TalocodeError(401, 'Phone authorization is required');
         return sendJson(res, 200, { local: false, device: phoneDevice });
       }
       if (req.method === 'POST' && path === '/api/remote/access/enable') {
@@ -111,8 +111,8 @@ export class AgentDeckDaemon {
         const body = asRecord(await readBody(req));
         return sendJson(res, 200, await this.core.revokePhoneDevice(requiredString(body.deviceId, 'deviceId')));
       }
-      if (!localRequest && path.startsWith('/api/') && !phoneDevice) throw new AgentDeckError(401, 'Phone authorization is required');
-      if (!localRequest && isRemoteBlocked(path, req.method || 'GET')) throw new AgentDeckError(403, 'This API is not available from phone control');
+      if (!localRequest && path.startsWith('/api/') && !phoneDevice) throw new TalocodeError(401, 'Phone authorization is required');
+      if (!localRequest && isRemoteBlocked(path, req.method || 'GET')) throw new TalocodeError(403, 'This API is not available from phone control');
 
       if (req.method === 'GET' && path === '/api/phone/snapshot') return sendJson(res, 200, await this.core.phoneSafeSnapshot(this.url()));
 
@@ -183,12 +183,12 @@ export class AgentDeckDaemon {
       }
       if (req.method === 'POST' && path === '/api/integrations/config/preview') {
         const request = parseIntegrationRequest(await readBody(req));
-        if (!request.targetTool) throw new AgentDeckError(400, 'targetTool is required');
+        if (!request.targetTool) throw new TalocodeError(400, 'targetTool is required');
         return sendJson(res, 200, await this.core.configureIntegration(request.targetTool, { ...request, dryRun: true, writeConfig: false }));
       }
       if (req.method === 'POST' && path === '/api/integrations/config/write') {
         const request = parseIntegrationRequest(await readBody(req));
-        if (!request.targetTool) throw new AgentDeckError(400, 'targetTool is required');
+        if (!request.targetTool) throw new TalocodeError(400, 'targetTool is required');
         return sendJson(res, 200, await this.core.configureIntegration(request.targetTool, { ...request, dryRun: false, writeConfig: true }));
       }
 
@@ -201,7 +201,7 @@ export class AgentDeckDaemon {
       }
       return sendJson(res, 404, { error: 'Not found' });
     } catch (error) {
-      const status = error instanceof AgentDeckError ? error.status : 500;
+      const status = error instanceof TalocodeError ? error.status : 500;
       const message = error instanceof Error ? error.message : 'Unknown error';
       return sendJson(res, status, { error: redact(message) });
     }
@@ -216,7 +216,7 @@ export class AgentDeckDaemon {
       this.server.once('error', reject);
       this.server.listen(this.port, this.host, () => resolve());
     });
-    console.log(`[AgentDeck] Daemon rebound at ${this.url()}`);
+    console.log(`[Talocode] Daemon rebound at ${this.url()}`);
   }
 
   private async streamSession(id: string, res: ServerResponse): Promise<void> {
@@ -243,12 +243,12 @@ export class AgentDeckDaemon {
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new AgentDeckError(400, 'Request body must be a JSON object');
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TalocodeError(400, 'Request body must be a JSON object');
   return value as Record<string, unknown>;
 }
 
 function requiredString(value: unknown, field: string): string {
-  if (typeof value !== 'string' || !value.trim()) throw new AgentDeckError(400, `${field} is required`);
+  if (typeof value !== 'string' || !value.trim()) throw new TalocodeError(400, `${field} is required`);
   return value;
 }
 
@@ -257,7 +257,7 @@ function optionalString(value: unknown): string | undefined {
 }
 
 function requireLocal(localRequest: boolean): void {
-  if (!localRequest) throw new AgentDeckError(403, 'This operation is only available from the desktop localhost dashboard or CLI');
+  if (!localRequest) throw new TalocodeError(403, 'This operation is only available from the desktop localhost dashboard or CLI');
 }
 
 export function isRemoteBlocked(path: string, method: string): boolean {
@@ -283,7 +283,7 @@ async function readBody(req: IncomingMessage): Promise<unknown> {
   try {
     return JSON.parse(Buffer.concat(chunks).toString('utf-8'));
   } catch {
-    throw new AgentDeckError(400, 'Request body must be valid JSON');
+    throw new TalocodeError(400, 'Request body must be valid JSON');
   }
 }
 

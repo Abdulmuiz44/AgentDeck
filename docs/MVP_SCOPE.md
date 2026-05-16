@@ -1,6 +1,6 @@
 # MVP Scope
 
-The MVP establishes AgentDeck as a local-first, Windows-first agent cockpit following the architecture in `docs/ARCHITECTURE.md`.
+The MVP establishes Talocode as a local-first, Windows-first agent cockpit following the architecture in `docs/ARCHITECTURE.md`.
 
 ```mermaid
 flowchart TB
@@ -11,7 +11,7 @@ flowchart TB
     APIClients["Local API Clients"]
   end
 
-  subgraph Core["AgentDeck Core"]
+  subgraph Core["Talocode Core"]
     Daemon["Daemon / Background Service"]
     HTTP["Local HTTP API"]
     Sessions["Session Manager"]
@@ -60,7 +60,7 @@ flowchart TB
 
 ## Implemented now
 
-- Architecture source stored as Mermaid text in `docs/agentdeck-architecture.mmd` and embedded in documentation so PRs remain reviewable.
+- Architecture source stored as Mermaid text in `docs/talocode-architecture.mmd` and embedded in documentation so PRs remain reviewable.
 - Local daemon and HTTP API.
 - Provider metadata management for Ollama, OpenRouter, custom OpenAI-compatible endpoints, OpenAI, Anthropic placeholder, and Gemini placeholder.
 - Agent adapter registry and PATH discovery.
@@ -92,3 +92,7 @@ flowchart TB
 ## Stabilization acceptance
 
 The MVP should pass `npm install`, `npm run lint`, `npm test`, `npm run build`, and `npm run smoke` before release handoff.
+
+## Migration from AgentDeck
+
+Talocode started as the AgentDeck prototype. The project has moved to the Talocode brand and repository at https://github.com/talocode/talocode.

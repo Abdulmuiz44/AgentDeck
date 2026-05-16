@@ -1,7 +1,7 @@
-# AgentDeck MVP Plan
+# Talocode MVP Plan
 
 ## Vision
-AgentDeck is a Windows-first desktop workspace for developers running multiple AI coding agents, terminals, dev servers, and test runners side by side in a single window.
+Talocode is a Windows-first desktop workspace for developers running multiple AI coding agents, terminals, dev servers, and test runners side by side in a single window.
 
 ## MVP Goal
 Create the smallest useful desktop app where a developer can:
@@ -20,7 +20,7 @@ Create the smallest useful desktop app where a developer can:
 - **Bundler:** Vite 6 with @vitejs/plugin-react
 - **Terminal:** xterm.js 5 + xterm-addon-fit
 - **PTY:** node-pty 1.x
-- **Persistence:** Local JSON in `%APPDATA%/AgentDeck/`
+- **Persistence:** Local JSON in `%APPDATA%/Talocode/`
 - **Default Shell:** PowerShell (WSL optional)
 
 ## Screens
@@ -74,3 +74,7 @@ Create the smallest useful desktop app where a developer can:
 - Workspace sharing
 - Custom keybindings
 - Advanced layout saving/restoring
+
+## Migration from AgentDeck
+
+Talocode started as the AgentDeck prototype. The project has moved to the Talocode brand and repository at https://github.com/talocode/talocode.
