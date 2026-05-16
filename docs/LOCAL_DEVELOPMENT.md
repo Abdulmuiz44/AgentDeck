@@ -13,7 +13,7 @@
 npm install
 ```
 
-If optional native PTY support is unavailable, AgentDeck still builds and sessions fall back to process mode. To use PTY on Windows, install a supported Node LTS version and the Windows build tools required by `node-pty`, then reinstall optional dependencies.
+If optional native PTY support is unavailable, Talocode still builds and sessions fall back to process mode. To use PTY on Windows, install a supported Node LTS version and the Windows build tools required by `node-pty`, then reinstall optional dependencies.
 
 ## Run the dashboard in development
 
@@ -21,7 +21,7 @@ If optional native PTY support is unavailable, AgentDeck still builds and sessio
 npm run dev
 ```
 
-The Electron app starts the AgentDeck daemon automatically when possible. If Electron was skipped by optional dependency handling, use the daemon/browser workflow instead.
+The Electron app starts the Talocode daemon automatically when possible. If Electron was skipped by optional dependency handling, use the daemon/browser workflow instead.
 
 ## Run the daemon directly
 
@@ -33,8 +33,8 @@ node dist/cli/index.js start
 Optional Windows-friendly overrides:
 
 ```powershell
-$env:AGENTDECK_PORT = "3886"
-$env:AGENTDECK_DATA_DIR = "$env:TEMP\AgentDeck Dev"
+$env:TALOCODE_PORT = "3886"
+$env:TALOCODE_DATA_DIR = "$env:TEMP\Talocode Dev"
 node dist/cli/index.js start
 ```
 
@@ -56,3 +56,7 @@ The automated smoke script verifies `/health`, `/api/status`, `/api/providers`, 
 - The Electron binary may not be present if optional dependency download was skipped; the CLI daemon remains usable.
 - PTY mode depends on `node-pty`; process mode is the supported fallback.
 - Windows service install/uninstall requires Administrator rights.
+
+## Migration from AgentDeck
+
+Talocode started as the AgentDeck prototype. The project has moved to the Talocode brand and repository at https://github.com/talocode/talocode.

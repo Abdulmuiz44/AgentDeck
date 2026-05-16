@@ -6,7 +6,7 @@ import type { Workspace, Pane } from '../types';
 
 declare global {
   interface Window {
-    __agentdeck_npmScripts?: string[];
+    __talocode_npmScripts?: string[];
   }
 }
 

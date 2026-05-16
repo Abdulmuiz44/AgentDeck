@@ -1,8 +1,8 @@
 import { app, BrowserWindow } from 'electron';
 import { join } from 'path';
 import { registerIpcHandlers } from './ipc-handlers';
-import { AgentDeckDaemon } from './agentdeck/daemon-server';
-import { createAgentDeckTray, destroyAgentDeckTray } from './tray';
+import { TalocodeDaemon } from './talocode/daemon-server';
+import { createTalocodeTray, destroyTalocodeTray } from './tray';
 
 const isDev = !app.isPackaged;
 
@@ -12,7 +12,7 @@ function createWindow(): void {
     height: 900,
     minWidth: 900,
     minHeight: 600,
-    title: 'AgentDeck',
+    title: 'Talocode',
     backgroundColor: '#0d1117',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -30,11 +30,11 @@ function createWindow(): void {
   }
 }
 
-let daemon: AgentDeckDaemon | null = null;
+let daemon: TalocodeDaemon | null = null;
 
 async function startDaemon(): Promise<void> {
   if (daemon) return;
-  daemon = new AgentDeckDaemon({ staticDir: join(__dirname, '../renderer') });
+  daemon = new TalocodeDaemon({ staticDir: join(__dirname, '../renderer') });
   await daemon.start();
 }
 
@@ -60,10 +60,10 @@ app.whenReady().then(async () => {
   try {
     await startDaemon();
   } catch (error) {
-    console.warn('AgentDeck daemon did not start from Electron:', error);
+    console.warn('Talocode daemon did not start from Electron:', error);
   }
   createWindow();
-  createAgentDeckTray(() => daemon, { start: startDaemon, stop: stopDaemon, restart: restartDaemon, openWindow: openMainWindow });
+  createTalocodeTray(() => daemon, { start: startDaemon, stop: stopDaemon, restart: restartDaemon, openWindow: openMainWindow });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -75,8 +75,8 @@ app.whenReady().then(async () => {
 app.on('before-quit', async (event: { preventDefault(): void }) => {
   if (!daemon) return;
   event.preventDefault();
-  destroyAgentDeckTray();
-  await stopDaemon().catch((error) => console.warn('AgentDeck daemon did not stop cleanly:', error));
+  destroyTalocodeTray();
+  await stopDaemon().catch((error) => console.warn('Talocode daemon did not stop cleanly:', error));
   app.exit(0);
 });
 

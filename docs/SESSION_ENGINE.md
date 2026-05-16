@@ -7,7 +7,7 @@ A session represents one agent run attached to a project, agent adapter, provide
 ## Lifecycle
 
 - `created`: session record exists but has not launched.
-- `starting`: AgentDeck is preparing the process.
+- `starting`: Talocode is preparing the process.
 - `running`: child process is active.
 - `stopped`: user stopped the process or the daemon restarted.
 - `completed`: process exited with code `0`.
@@ -30,11 +30,11 @@ A session represents one agent run attached to a project, agent adapter, provide
 
 ## Logs and paths
 
-Logs are written under the AgentDeck data directory at `logs/<session-id>.log`. Windows data defaults to `%APPDATA%\AgentDeck`; paths with spaces are supported by Node path APIs and no shell interpolation is used for known adapter launches.
+Logs are written under the Talocode data directory at `logs/<session-id>.log`. Windows data defaults to `%APPDATA%\Talocode`; paths with spaces are supported by Node path APIs and no shell interpolation is used for known adapter launches.
 
 ## Safety
 
-AgentDeck only starts known adapters, validates project directories, and launches processes with `shell: false` to reduce command-injection risk.
+Talocode only starts known adapters, validates project directories, and launches processes with `shell: false` to reduce command-injection risk.
 
 ## Partial/fallback behavior
 
@@ -43,3 +43,7 @@ PTY mode uses optional `node-pty` when available and falls back to process mode 
 ## Next phase
 
 Add templates, structured event replay, searchable timelines, and deeper xterm.js attachment.
+
+## Migration from AgentDeck
+
+Talocode started as the AgentDeck prototype. The project has moved to the Talocode brand and repository at https://github.com/talocode/talocode.

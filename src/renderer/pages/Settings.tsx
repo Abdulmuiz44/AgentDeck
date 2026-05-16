@@ -9,7 +9,7 @@ export default function Settings({ onBack }: Props) {
   const [saved, setSaved] = useState(false);
 
   const handleSave = () => {
-    localStorage.setItem('agentdeck:fontSize', String(fontSize));
+    localStorage.setItem('talocode:fontSize', String(fontSize));
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };

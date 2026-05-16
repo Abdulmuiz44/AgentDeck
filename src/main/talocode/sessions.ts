@@ -3,7 +3,7 @@ import { mkdir, readFile, stat } from 'fs/promises';
 import { basename, resolve, join, win32 } from 'path';
 import { randomUUID } from 'crypto';
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
-import type { AgentDeckStore, AgentSession, ProjectRegistration, SessionMode, SessionStatus } from './types';
+import type { TalocodeStore, AgentSession, ProjectRegistration, SessionMode, SessionStatus } from './types';
 import { getLogsDir } from './paths';
 import { getAdapter, renderArgs, renderCommand } from './agents';
 import { discoverAdapter } from './discovery';
@@ -172,7 +172,7 @@ export async function startSession(store: JsonStore, id: string): Promise<AgentS
   const args = renderArgs(adapter.argsTemplate, { model: session.model });
   const startedAt = new Date().toISOString();
   const mode = session.mode || 'pty';
-  output.write(`\n[AgentDeck] ${startedAt} starting (${mode}): ${renderCommand(adapter, discovered.path, { model: session.model })}\n`);
+  output.write(`\n[Talocode] ${startedAt} starting (${mode}): ${renderCommand(adapter, discovered.path, { model: session.model })}\n`);
 
   if (mode === 'pty') {
     const pty = spawnPty(discovered.path, args, { cwd: session.cwd, env: process.env, cols: session.terminalCols || 120, rows: session.terminalRows || 30 });
@@ -187,7 +187,7 @@ export async function startSession(store: JsonStore, id: string): Promise<AgentS
       pty.onExit(async (event) => {
         runningProcesses.delete(id);
         const stoppedAt = new Date().toISOString();
-        output.write(`\n[AgentDeck] ${stoppedAt} PTY exited with code ${event.exitCode}\n`);
+        output.write(`\n[Talocode] ${stoppedAt} PTY exited with code ${event.exitCode}\n`);
         output.end();
         const status: SessionStatus = event.exitCode === 0 ? 'completed' : 'failed';
         await markSession(store, id, status, { exitCode: event.exitCode, stoppedAt, processId: undefined, pid: undefined });
@@ -197,7 +197,7 @@ export async function startSession(store: JsonStore, id: string): Promise<AgentS
       publishSessionEvent(createSessionEvent({ type: 'session_started', sessionId: id, status: 'running' }));
       return session;
     }
-    output.write('[AgentDeck] node-pty unavailable; falling back to process mode.\n');
+    output.write('[Talocode] node-pty unavailable; falling back to process mode.\n');
     await patchSession(store, id, { mode: 'process', error: 'PTY unavailable; using process fallback.' });
   }
 
@@ -218,7 +218,7 @@ export async function startSession(store: JsonStore, id: string): Promise<AgentS
   child.on('exit', async (code) => {
     runningProcesses.delete(id);
     const stoppedAt = new Date().toISOString();
-    output.write(`\n[AgentDeck] ${stoppedAt} exited with code ${code ?? 'null'}\n`);
+    output.write(`\n[Talocode] ${stoppedAt} exited with code ${code ?? 'null'}\n`);
     output.end();
     const status: SessionStatus = code === 0 ? 'completed' : 'failed';
     await markSession(store, id, status, { exitCode: code, stoppedAt, processId: undefined, pid: undefined });
@@ -227,7 +227,7 @@ export async function startSession(store: JsonStore, id: string): Promise<AgentS
   child.on('error', async (error) => {
     runningProcesses.delete(id);
     const stoppedAt = new Date().toISOString();
-    output.write(`\n[AgentDeck] ${stoppedAt} error: ${redact(error.message)}\n`);
+    output.write(`\n[Talocode] ${stoppedAt} error: ${redact(error.message)}\n`);
     output.end();
     await markSession(store, id, 'failed', { error: redact(error.message), stoppedAt, processId: undefined, pid: undefined });
     publishSessionEvent(createSessionEvent({ type: 'session_failed', sessionId: id, status: 'failed', error: redact(error.message) }));
@@ -242,7 +242,7 @@ export async function stopSession(store: JsonStore, id: string): Promise<AgentSe
   const running = runningProcesses.get(id);
   const stoppedAt = new Date().toISOString();
   if (running) {
-    running.output.write(`\n[AgentDeck] ${stoppedAt} stopping session\n`);
+    running.output.write(`\n[Talocode] ${stoppedAt} stopping session\n`);
     if (running.pty) running.pty.kill();
     if (running.child) running.child.kill(process.platform === 'win32' ? undefined : 'SIGTERM');
     runningProcesses.delete(id);
@@ -293,7 +293,7 @@ export async function stopAllSessions(store: JsonStore): Promise<void> {
 
 async function patchSession(store: JsonStore, id: string, patch: Partial<AgentSession>): Promise<AgentSession> {
   let updated: AgentSession | undefined;
-  await store.update((data: AgentDeckStore) => {
+  await store.update((data: TalocodeStore) => {
     const idx = data.sessions.findIndex((item) => item.id === id);
     if (idx < 0) throw new Error('Unknown session id');
     data.sessions[idx] = { ...data.sessions[idx], ...patch, updatedAt: new Date().toISOString() };
@@ -305,7 +305,7 @@ async function patchSession(store: JsonStore, id: string, patch: Partial<AgentSe
 
 async function markSession(store: JsonStore, id: string, status: SessionStatus, patch: Partial<AgentSession> = {}): Promise<AgentSession> {
   let updated: AgentSession | undefined;
-  await store.update((data: AgentDeckStore) => {
+  await store.update((data: TalocodeStore) => {
     const idx = data.sessions.findIndex((item) => item.id === id);
     if (idx < 0) throw new Error('Unknown session id');
     data.sessions[idx] = { ...data.sessions[idx], ...patch, status, updatedAt: new Date().toISOString() };

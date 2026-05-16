@@ -1,7 +1,7 @@
 {
-  "name": "agentdeck",
+  "name": "talocode",
   "version": "0.1.0",
-  "description": "Windows-first desktop workspace for AI coding agents, terminals, dev servers, and test runners",
+  "description": "Local-first control plane for coding agents.",
   "main": "dist/main/index.js",
   "scripts": {
     "dev": "npm run build:main && concurrently \"vite\" \"wait-on http://localhost:5173 && node scripts/start-electron.mjs\"",
@@ -11,9 +11,10 @@
     "start": "node scripts/start-electron.mjs",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "agentdeck": "node dist/cli/index.js",
     "test": "tsc -p tsconfig.test.json && node --test dist-tests/tests/*.test.js",
-    "smoke": "node scripts/smoke-test.mjs"
+    "smoke": "node scripts/smoke-test.mjs",
+    "talo": "node dist/cli/index.js",
+    "agentdeck": "node dist/cli/index.js"
   },
   "keywords": [
     "electron",
@@ -41,8 +42,8 @@
     "wait-on": "^8.0.0"
   },
   "build": {
-    "appId": "com.agentdeck.app",
-    "productName": "AgentDeck",
+    "appId": "com.talocode.app",
+    "productName": "Talocode",
     "files": [
       "dist/**/*",
       "package.json"
@@ -55,10 +56,19 @@
     }
   },
   "bin": {
-    "agentdeck": "dist/cli/index.js"
+    "talo": "./dist/cli/index.js",
+    "agentdeck": "./dist/cli/index.js"
   },
   "optionalDependencies": {
     "node-pty": "^1.0.0",
     "electron": "^33.0.0"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/talocode/talocode.git"
+  },
+  "bugs": {
+    "url": "https://github.com/talocode/talocode/issues"
+  },
+  "homepage": "https://github.com/talocode/talocode#readme"
 }

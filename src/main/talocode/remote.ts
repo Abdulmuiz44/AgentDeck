@@ -11,7 +11,7 @@ export function generateToken(bytes = 24): string {
 }
 
 export function hashToken(token: string): string {
-  return createHash('sha256').update(`agentdeck:v1:${token}`).digest('hex');
+  return createHash('sha256').update(`talocode:v1:${token}`).digest('hex');
 }
 
 export function verifyToken(token: string, expectedHash?: string): boolean {
@@ -49,9 +49,9 @@ export function buildPhoneUrl(baseUrl: string, token?: string): string {
 export function buildWarnings(settings: RemoteAccessSettings, lanUrls: string[], currentBindHost?: string): string[] {
   const warnings: string[] = [];
   if (settings.phoneAccessEnabled) {
-    warnings.push('Phone control is enabled for your local network. Anyone with a valid pairing link or paired device token can control AgentDeck sessions.');
+    warnings.push('Phone control is enabled for your local network. Anyone with a valid pairing link or paired device token can control Talocode sessions.');
     if (settings.bindHost === '0.0.0.0') warnings.push('The daemon is configured to bind to 0.0.0.0 so devices on the same LAN can reach it.');
-    if (currentBindHost && isLocalOnlyHost(currentBindHost)) warnings.push('The current daemon listener is still localhost-only. Restart AgentDeck or use agentdeck start with phone access enabled to accept LAN connections.');
+    if (currentBindHost && isLocalOnlyHost(currentBindHost)) warnings.push('The current daemon listener is still localhost-only. Restart Talocode or use talo start with phone access enabled to accept LAN connections.');
   }
   if (!lanUrls.length) warnings.push('No LAN IPv4 address was detected. Check Wi-Fi/Ethernet or set a manual publicLanUrl override.');
   return warnings;
@@ -62,7 +62,7 @@ export function isLocalOnlyHost(host?: string): boolean {
 }
 
 export function isLocalRequest(req: IncomingMessage): boolean {
-  if (req.headers['x-agentdeck-remote-client'] === 'phone') return false;
+  if (req.headers['x-talocode-remote-client'] === 'phone') return false;
   const address = req.socket.remoteAddress || '';
   return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1' || address === 'localhost';
 }

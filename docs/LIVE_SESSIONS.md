@@ -2,12 +2,12 @@
 
 ## Implemented now
 
-AgentDeck supports two execution modes:
+Talocode supports two execution modes:
 
-- `pty`: preferred live terminal mode. AgentDeck attempts to load optional `node-pty` at runtime, starts the known adapter in the project cwd, streams output through Server-Sent Events, accepts input, and supports resize events.
+- `pty`: preferred live terminal mode. Talocode attempts to load optional `node-pty` at runtime, starts the known adapter in the project cwd, streams output through Server-Sent Events, accepts input, and supports resize events.
 - `process`: fallback mode using `child_process.spawn` with `shell: false`. Output is still streamed and logged, but terminal behavior is less interactive.
 
-If `node-pty` is not installed or cannot load, AgentDeck logs a clear fallback message and starts process mode instead.
+If `node-pty` is not installed or cannot load, Talocode logs a clear fallback message and starts process mode instead.
 
 ## API
 
@@ -33,3 +33,7 @@ PTY support is optional. For best Windows PTY behavior, use a Node LTS release, 
 - Process fallback is not a full interactive terminal.
 - The dashboard log panel is not a full xterm.js attach session yet.
 - Session templates and structured event search are future work.
+
+## Migration from AgentDeck
+
+Talocode started as the AgentDeck prototype. The project has moved to the Talocode brand and repository at https://github.com/talocode/talocode.
