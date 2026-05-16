@@ -34,3 +34,7 @@
 - Team dashboards and policy sharing.
 - Secure OS keychain-backed secret references.
 - Provider/model compatibility recommendations.
+
+## Migration from AgentDeck
+
+Talocode started as the AgentDeck prototype. The project has moved to the Talocode brand and repository at https://github.com/talocode/talocode.

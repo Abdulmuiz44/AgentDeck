@@ -34,7 +34,7 @@ export default function Sidebar({ workspace, panes, onBack, onSettings }: Props)
             marginBottom: 4,
           }}
         >
-          AgentDeck
+          Talocode
         </h1>
         <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{workspace.name}</div>
         <div

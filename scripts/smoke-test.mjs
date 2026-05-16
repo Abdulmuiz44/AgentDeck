@@ -13,8 +13,8 @@ const renderer = join(root, 'dist', 'renderer', 'index.html');
 async function main() {
   await ensureBuilt();
   const port = await freePort();
-  const dataDir = await mkdtemp(join(tmpdir(), 'agentdeck-smoke-'));
-  const env = { ...process.env, AGENTDECK_PORT: String(port), AGENTDECK_DATA_DIR: dataDir, NO_PROXY: '*', no_proxy: '*' };
+  const dataDir = await mkdtemp(join(tmpdir(), 'talocode-smoke-'));
+  const env = { ...process.env, TALOCODE_PORT: String(port), TALOCODE_DATA_DIR: dataDir, NO_PROXY: '*', no_proxy: '*' };
   const child = spawn(process.execPath, [cli, 'start'], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
   let output = '';
   child.stdout.on('data', (chunk) => { output += chunk.toString(); });
@@ -31,7 +31,7 @@ async function main() {
     await getJson(`${base}/api/system/discover`);
     await getJson(`${base}/api/remote/access`);
     await expectText(`${base}/phone`, 200, '<!doctype html>');
-    await expectText(`${base}/architecture`, 200, 'AgentDeck Architecture');
+    await expectText(`${base}/architecture`, 200, 'Talocode Architecture');
     await expectText(`${base}/architecture`, 200, 'Access Layer');
     await expectText(`${base}/architecture`, 200, 'Provider Router');
     await expectText(`${base}/architecture`, 200, 'Execution & Storage');
@@ -40,10 +40,10 @@ async function main() {
     assert(enabled.pairingToken, 'remote enable did not return one-time pairing token');
     assert(enabled.phoneUrl, 'remote enable did not return phoneUrl');
     await waitFor(`${base}/health`, 200, 10_000);
-    const paired = await postJson(`${base}/api/remote/pair`, { token: enabled.pairingToken, deviceName: 'Smoke Test Phone', userAgent: 'agentdeck-smoke' });
+    const paired = await postJson(`${base}/api/remote/pair`, { token: enabled.pairingToken, deviceName: 'Smoke Test Phone', userAgent: 'talocode-smoke' });
     assert(paired.accessToken, 'pairing did not return accessToken');
     assert(paired.deviceId, 'pairing did not return deviceId');
-    const phoneHeaders = { Authorization: `Bearer ${paired.accessToken}`, 'X-AgentDeck-Remote-Client': 'phone' };
+    const phoneHeaders = { Authorization: `Bearer ${paired.accessToken}`, 'X-Talocode-Remote-Client': 'phone' };
     const snapshot = await getJson(`${base}/api/phone/snapshot`, phoneHeaders);
     assert(snapshot.status && Array.isArray(snapshot.providers), 'phone snapshot shape is invalid');
     const blocked = await postJson(`${base}/api/integrations/config/write`, {}, phoneHeaders, true);
@@ -53,12 +53,29 @@ async function main() {
     const afterRevoke = await fetch(`${base}/api/phone/snapshot`, { headers: phoneHeaders });
     assert(afterRevoke.status === 401, `revoked token should fail with 401, got ${afterRevoke.status}`);
     await postJson(`${base}/api/remote/access/disable`, {});
-    console.log(`AgentDeck smoke test passed on port ${port}`);
+    console.log(`Talocode smoke test passed on port ${port}`);
   } finally {
     child.kill(process.platform === 'win32' ? undefined : 'SIGTERM');
     await waitForExit(child, 8000).catch(() => child.kill('SIGKILL'));
     await rm(dataDir, { recursive: true, force: true });
-    if (output && process.env.AGENTDECK_SMOKE_VERBOSE) console.log(output);
+    if (output && process.env.TALOCODE_SMOKE_VERBOSE) console.log(output);
+  }
+  await verifyLegacyPortFallback();
+}
+
+async function verifyLegacyPortFallback() {
+  const port = await freePort();
+  const dataDir = await mkdtemp(join(tmpdir(), 'talocode-legacy-smoke-'));
+  const env = { ...process.env, AGENTDECK_PORT: String(port), TALOCODE_PORT: undefined, TALOCODE_DATA_DIR: dataDir, NO_PROXY: '*', no_proxy: '*' };
+  delete env.TALOCODE_PORT;
+  const child = spawn(process.execPath, [cli, 'start'], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
+  try {
+    await waitFor(`http://127.0.0.1:${port}/health`, 200, 20_000);
+    await getJson(`http://127.0.0.1:${port}/health`);
+  } finally {
+    child.kill(process.platform === 'win32' ? undefined : 'SIGTERM');
+    await waitForExit(child, 8000).catch(() => child.kill('SIGKILL'));
+    await rm(dataDir, { recursive: true, force: true });
   }
 }
 

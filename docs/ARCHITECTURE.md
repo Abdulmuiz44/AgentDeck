@@ -1,4 +1,4 @@
-# AgentDeck Architecture
+# Talocode Architecture
 
 ```mermaid
 flowchart TB
@@ -9,7 +9,7 @@ flowchart TB
     APIClients["Local API Clients"]
   end
 
-  subgraph Core["AgentDeck Core"]
+  subgraph Core["Talocode Core"]
     Daemon["Daemon / Background Service"]
     HTTP["Local HTTP API"]
     Sessions["Session Manager"]
@@ -58,20 +58,20 @@ flowchart TB
 
 The architecture diagram is stored as Mermaid text so PRs stay reviewable. Generated PNGs should not be committed.
 
-AgentDeck follows an Ollama-inspired local architecture for agent orchestration. The goal is to make one command start a local control plane that can discover tools, configure providers, register projects, launch sessions, capture logs, and expose the same capabilities through a dashboard and HTTP API.
+Talocode follows an Ollama-inspired local architecture for agent orchestration. The goal is to make one command start a local control plane that can discover tools, configure providers, register projects, launch sessions, capture logs, and expose the same capabilities through a dashboard and HTTP API.
 
 ## Layer 1: Access Layer
 
 The access layer is intentionally simple:
 
-- `agentdeck` CLI for daemon lifecycle, status, discovery, providers, projects, sessions, and dashboard opening.
+- `talocode` CLI for daemon lifecycle, status, discovery, providers, projects, sessions, and dashboard opening.
 - Electron desktop app for a Windows-first cockpit experience.
 - Local dashboard served by the daemon after a production build.
 - Local HTTP API for future integrations and external tooling.
 
 All access paths converge on the same local daemon so behavior is consistent regardless of UI.
 
-## Layer 2: AgentDeck Core
+## Layer 2: Talocode Core
 
 The core service owns product state and orchestration responsibilities:
 
@@ -87,7 +87,7 @@ The core is separate from the HTTP server so a future Windows service wrapper ca
 
 ## Layer 3: Agent Adapter Registry
 
-Adapters define how AgentDeck understands external tools. The current registry includes:
+Adapters define how Talocode understands external tools. The current registry includes:
 
 - Codex CLI
 - Codex App
@@ -123,7 +123,7 @@ Execution is deliberately constrained for safety:
 
 ## Layer 6: Outcomes
 
-AgentDeck's architecture enables the user to:
+Talocode's architecture enables the user to:
 
 - Discover installed agent tools.
 - Configure local and hosted providers.
@@ -134,12 +134,16 @@ AgentDeck's architecture enables the user to:
 
 ## Why this architecture
 
-Agent orchestration needs a local control plane because agent tools, project paths, shells, logs, and model runtime credentials are machine-local concerns. The Ollama-style daemon/API/CLI pattern gives AgentDeck a small, predictable foundation that can later grow into a Windows service, tray app, richer PTY streaming, provider model sync, and optional team/cloud sync without replacing the local-first core.
+Agent orchestration needs a local control plane because agent tools, project paths, shells, logs, and model runtime credentials are machine-local concerns. The Ollama-style daemon/API/CLI pattern gives Talocode a small, predictable foundation that can later grow into a Windows service, tray app, richer PTY streaming, provider model sync, and optional team/cloud sync without replacing the local-first core.
 
 ## Current local API surface
 
-The daemon exposes health/status, provider CRUD and tests, project CRUD, session lifecycle/logs, discovery cache/refresh, settings export/reset, and integration config preview/write endpoints. The HTTP layer delegates business logic to `AgentDeckCore`, keeping the future Windows service path clear.
+The daemon exposes health/status, provider CRUD and tests, project CRUD, session lifecycle/logs, discovery cache/refresh, settings export/reset, and integration config preview/write endpoints. The HTTP layer delegates business logic to `TalocodeCore`, keeping the future Windows service path clear.
 
 ## Phone-to-desktop control layer
 
 The daemon now includes an explicit remote-access layer. Localhost clients keep the regular dashboard/CLI flow, while LAN clients must pair through `/api/remote/pair` and then present a bearer token for protected APIs. The `/phone` route is a mobile-first UI that consumes safe daemon endpoints without exposing raw secrets or desktop-only destructive actions.
+
+## Migration from AgentDeck
+
+Talocode started as the AgentDeck prototype. The project has moved to the Talocode brand and repository at https://github.com/talocode/talocode.

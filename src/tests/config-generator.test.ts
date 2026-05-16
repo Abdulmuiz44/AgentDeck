@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { generateOpenAICompatibleConfig } from '../main/agentdeck/config-generator';
+import { generateOpenAICompatibleConfig } from '../main/talocode/config-generator';
 
 test('generates Codex OpenAI-compatible config without raw secrets', () => {
   const result = generateOpenAICompatibleConfig({
@@ -27,34 +27,34 @@ test('generates OpenCode config with env-var reference', () => {
   });
 
   const parsed = JSON.parse(result.generatedConfigText);
-  assert.equal(parsed.provider.agentdeck.options.apiKey, '{env:OLLAMA_API_KEY}');
-  assert.equal(parsed.provider.agentdeck.options.baseURL, 'http://localhost:11434/v1');
+  assert.equal(parsed.provider.talocode.options.apiKey, '{env:OLLAMA_API_KEY}');
+  assert.equal(parsed.provider.talocode.options.baseURL, 'http://localhost:11434/v1');
 });
 
 test('provider normalization rejects raw-looking API key values', async () => {
-  const { normalizeProvider } = await import('../main/agentdeck/providers');
+  const { normalizeProvider } = await import('../main/talocode/providers');
   assert.throws(() => normalizeProvider({ name: 'Unsafe', type: 'openrouter', apiKeyEnvVar: 'sk-raw-secret' }), /environment variable name/);
 });
 
 test('session command rendering uses argument templates without shell interpolation', async () => {
-  const { getAdapter, renderArgs } = await import('../main/agentdeck/agents');
+  const { getAdapter, renderArgs } = await import('../main/talocode/agents');
   const adapter = getAdapter('codex-cli');
   assert.ok(adapter);
   assert.deepEqual(renderArgs(adapter.argsTemplate, { model: 'llama3.1' }), ['--model', 'llama3.1']);
 });
 
 test('project path validation accepts existing directories and rejects missing paths', async () => {
-  const { validateProjectPath } = await import('../main/agentdeck/sessions');
+  const { validateProjectPath } = await import('../main/talocode/sessions');
   assert.equal(await validateProjectPath(process.cwd()), process.cwd());
-  await assert.rejects(() => validateProjectPath('/definitely/missing/agentdeck/path'));
+  await assert.rejects(() => validateProjectPath('/definitely/missing/talocode/path'));
 });
 
 test('discovery returns safe missing result for unknown executable', async () => {
-  const { discoverTool } = await import('../main/agentdeck/discovery');
+  const { discoverTool } = await import('../main/talocode/discovery');
   const result = await discoverTool({
     id: 'missing-test-tool',
     name: 'Missing Test Tool',
-    executableNames: ['agentdeck-definitely-missing-tool'],
+    executableNames: ['talocode-definitely-missing-tool'],
     versionArgs: ['--version'],
     docsUrl: 'https://example.com',
     installHint: 'Install the missing test tool.',
@@ -65,7 +65,7 @@ test('discovery returns safe missing result for unknown executable', async () =>
 });
 
 test('session event factory stamps stream events', async () => {
-  const { createSessionEvent } = await import('../main/agentdeck/session-events');
+  const { createSessionEvent } = await import('../main/talocode/session-events');
   const event = createSessionEvent({ type: 'output', sessionId: 's1', data: 'hello' });
   assert.equal(event.type, 'output');
   assert.equal(event.sessionId, 's1');
@@ -73,7 +73,7 @@ test('session event factory stamps stream events', async () => {
 });
 
 test('PTY adapter reports availability without throwing', async () => {
-  const { isPtyAvailable } = await import('../main/agentdeck/pty-adapter');
+  const { isPtyAvailable } = await import('../main/talocode/pty-adapter');
   assert.equal(typeof isPtyAvailable(), 'boolean');
 });
 

@@ -1,3 +1,4 @@
+%% Talocode Architecture
 flowchart TB
   subgraph Access["Access Layer"]
     Phone["Phone Control"]
@@ -6,9 +7,9 @@ flowchart TB
     APIClients["Local API Clients"]
   end
 
-  subgraph Core["AgentDeck Core"]
-    Daemon["Daemon / Background Service"]
-    HTTP["Local HTTP API"]
+  subgraph Core["Talocode Core"]
+    Daemon["Talocode daemon / Background Service"]
+    HTTP["Talocode local API"]
     Sessions["Session Manager"]
     Config["Project & Config Manager"]
     Discovery["Discovery Engine"]
@@ -35,7 +36,7 @@ flowchart TB
     Paths["Local Project Paths"]
     Processes["Child Processes / Agent Sessions"]
     Logs["Logs & Session History"]
-    Settings["Settings / Local Persistence"]
+    Settings["Talocode-managed settings / Local Persistence"]
   end
 
   subgraph Outcomes["Outcomes"]
