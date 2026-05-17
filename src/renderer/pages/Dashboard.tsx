@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AgentAdapterView, DaemonHealth, DiscoveryView, ProjectView, ProviderConfigView, RemoteAccessView, SessionView } from '../types';
+import ContextCachePanel from '../components/ContextCachePanel';
+import BrowserRuntimePage from './BrowserRuntimePage';
 
-type Page = 'home' | 'architecture' | 'providers' | 'agents' | 'projects' | 'sessions' | 'integrations' | 'settings';
+type Page = 'home' | 'architecture' | 'providers' | 'agents' | 'projects' | 'sessions' | 'integrations' | 'settings' | 'browser';
 
 type DaemonStatusView = {
   status: string;
@@ -15,6 +17,7 @@ type DaemonStatusView = {
 const API = import.meta.env.VITE_TALOCODE_API_URL || 'http://127.0.0.1:3768';
 const REQUEST_TIMEOUT_MS = 5000;
 const pages: Page[] = ['home', 'architecture', 'providers', 'agents', 'projects', 'sessions', 'integrations', 'settings'];
+const pages: Page[] = ['home', 'architecture', 'providers', 'agents', 'projects', 'browser', 'sessions', 'integrations', 'settings'];
 
 export default function Dashboard() {
   const [page, setPage] = useState<Page>(window.location.pathname === '/architecture' ? 'architecture' : 'home');
@@ -100,6 +103,7 @@ export default function Dashboard() {
         {page === 'providers' && <Providers providers={providers} onChanged={refresh} />}
         {page === 'agents' && <Agents agents={agents} discovery={discovery} onChanged={refresh} />}
         {page === 'projects' && <Projects projects={projects} onChanged={refresh} />}
+        {page === 'browser' && <BrowserRuntimePage />}
         {page === 'sessions' && <Sessions sessions={sessions} projects={projects} providers={providers} agents={agents} ptyAvailable={health?.ptyAvailable !== false} onChanged={refresh} />}
         {page === 'integrations' && <Integrations providers={providers} />}
         {page === 'settings' && <SettingsPanel health={health} status={status} remoteAccess={remoteAccess} onChanged={refresh} />}
@@ -156,6 +160,8 @@ function Projects({ projects, onChanged }: { projects: ProjectView[]; onChanged:
   const [path, setPath] = useState('');
   const [description, setDescription] = useState('');
   return <div className="split-page"><section className="panel"><h3>Register project</h3><p className="muted">Use an absolute path. Talocode validates that it exists before saving.</p><input value={path} onChange={(e) => setPath(e.target.value)} placeholder="C:\\code\\my-app" /><input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional description" /><button className="primary" onClick={async () => { await post('/api/projects', { path, description }); setPath(''); setDescription(''); await onChanged(); }}>Add project</button></section><section className="panel"><h3>Projects</h3><div className="card-list">{projects.map((p) => <div className="list-card" key={p.id}><div className="panel-title"><strong>{p.name}</strong><StatusBadge status={p.pathStatus || 'valid'} /></div><span>{p.path}</span><small>{p.sessionsCount || 0} sessions - {p.description || 'No description'}</small><div className="row"><button onClick={async () => { await del(`/api/projects/${p.id}`); await onChanged(); }}>Remove</button></div></div>)}</div></section></div>;
+  const [cacheProjectId, setCacheProjectId] = useState<string | null>(null);
+  return <div className="split-page"><section className="panel"><h3>Register project</h3><p className="muted">Use an absolute path. Talocode validates that it exists before saving.</p><input value={path} onChange={(e) => setPath(e.target.value)} placeholder="C:\\code\\my-app" /><input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional description" /><button className="primary" onClick={async () => { await post('/api/projects', { path, description }); setPath(''); setDescription(''); await onChanged(); }}>Add project</button></section><section className="panel"><h3>Projects</h3><div className="card-list">{projects.map((p) => <div key={p.id}><div className="list-card"><div className="panel-title"><strong>{p.name}</strong><StatusBadge status={p.pathStatus || 'valid'} /></div><span>{p.path}</span><small>{p.sessionsCount || 0} sessions · {p.description || 'No description'}</small><div className="row"><button onClick={async () => { await del(`/api/projects/${p.id}`); await onChanged(); }}>Remove</button><button onClick={() => setCacheProjectId(cacheProjectId === p.id ? null : p.id)}>{cacheProjectId === p.id ? 'Hide Cache' : 'Cache'}</button></div></div>{cacheProjectId === p.id && <ContextCachePanel projectId={p.id} projectName={p.name} />}</div>)}</div></section></div>;
 }
 
 function Sessions({ sessions, projects, providers, agents, ptyAvailable, onChanged }: { sessions: SessionView[]; projects: ProjectView[]; providers: ProviderConfigView[]; agents: AgentAdapterView[]; ptyAvailable: boolean; onChanged: () => Promise<void> }) {
@@ -274,3 +280,7 @@ async function request<T,>(path: string, init: RequestInit = {}, timeoutMs = REQ
 async function get<T,>(path: string): Promise<T> { return request<T>(path); }
 async function post<T,>(path: string, body: unknown): Promise<T> { return request<T>(path, { method: 'POST', body: JSON.stringify(body) }); }
 async function del<T,>(path: string): Promise<T> { return request<T>(path, { method: 'DELETE' }); }
+function label(page: Page) { return page === 'architecture' ? 'Architecture' : page === 'browser' ? 'Browser' : page[0].toUpperCase() + page.slice(1); }
+async function get<T>(path: string): Promise<T> { const r = await fetch(`${API}${path}`); if (!r.ok) throw new Error(await r.text()); return r.json(); }
+async function post<T>(path: string, body: unknown): Promise<T> { const r = await fetch(`${API}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); if (!r.ok) throw new Error(await r.text()); return r.json(); }
+async function del<T>(path: string): Promise<T> { const r = await fetch(`${API}${path}`, { method: 'DELETE' }); if (!r.ok) throw new Error(await r.text()); return r.json(); }

@@ -2,15 +2,19 @@ import { mkdir, readFile, rename, writeFile } from 'fs/promises';
 import { dirname, resolve } from 'path';
 import { randomUUID } from 'crypto';
 import type { TalocodeStore } from './types';
-import { DEFAULT_HOST, DEFAULT_PORT, getStorePath, prepareDataDirMigration } from './paths';
+import { DEFAULT_HOST, DEFAULT_PORT, getStorePath, getDataDir, prepareDataDirMigration } from './paths';
 import { defaultProviders } from './providers';
 import { defaultBillingSettings } from './billing';
+import { resolveBrowserRuntimeConfig } from './browser-config';
 
 export function defaultStore(): TalocodeStore {
   return {
     providers: defaultProviders(),
     projects: [],
     sessions: [],
+    contextPacks: [],
+    browserSessions: [],
+    browserRuntimeConfig: resolveBrowserRuntimeConfig(),
     settings: {
       host: DEFAULT_HOST,
       port: DEFAULT_PORT,
@@ -47,6 +51,9 @@ export class JsonStore {
         providers: parsed.providers?.length ? parsed.providers : defaults.providers,
         projects: parsed.projects || [],
         sessions: parsed.sessions || [],
+        contextPacks: parsed.contextPacks || [],
+        browserSessions: parsed.browserSessions || [],
+        browserRuntimeConfig: parsed.browserRuntimeConfig || defaults.browserRuntimeConfig,
         settings: {
           ...defaults.settings,
           ...(parsed.settings || {}),
