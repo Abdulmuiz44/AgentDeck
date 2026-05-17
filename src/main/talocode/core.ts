@@ -1,7 +1,10 @@
 import { randomUUID } from 'crypto';
 import { getStorePath } from './paths';
 import { agentAdapters } from './agents';
+import { BrowserRuntime } from './browser-runtime';
+import { resolveBrowserRuntimeConfig } from './browser-config';
 import { generateOpenAICompatibleConfig, writeOpenAICompatibleConfig } from './config-generator';
+import { buildContextPack, computeCacheMeta, rebuildContextPackFn, validateContextPack } from './context-cache';
 import { discoverTools } from './discovery';
 import { DEFAULT_HOST, DEFAULT_PORT, envValue, getDataDir } from './paths';
 import { JsonStore } from './persistence';
@@ -26,6 +29,10 @@ import {
 import type {
   AgentAdapter,
   AgentSession,
+  BrowserAuditEvent,
+  BrowserSession,
+  ContextCacheMeta,
+  ContextPack,
   DaemonStatus,
   HealthStatus,
   IntegrationTarget,
@@ -36,6 +43,7 @@ import type {
   RemoteAccessStatus,
   RemoteAccessTokenResponse,
   SessionStatus,
+  TalocodeStore,
   ToolDiscoveryResult,
 } from './types';
 
@@ -90,8 +98,29 @@ const version = process.env.npm_package_version || '0.1.0';
 
 export class TalocodeCore {
   private lastError: string | undefined;
+  private browserRuntime: BrowserRuntime | undefined;
 
   constructor(private readonly store = new JsonStore()) {}
+
+  private getBrowserRuntime(): BrowserRuntime {
+    if (!this.browserRuntime) {
+      this.browserRuntime = new BrowserRuntime({
+        read: async () => {
+          const s = await this.store.read();
+          return { browserSessions: s.browserSessions, browserRuntimeConfig: s.browserRuntimeConfig };
+        },
+        write: async (mutator) => {
+          await this.store.update((s) => {
+            const subset = { browserSessions: s.browserSessions, browserRuntimeConfig: s.browserRuntimeConfig };
+            mutator(subset);
+            s.browserSessions = subset.browserSessions;
+            s.browserRuntimeConfig = subset.browserRuntimeConfig;
+          });
+        },
+      });
+    }
+    return this.browserRuntime;
+  }
 
   async initialize(): Promise<void> {
     await this.store.ensure();
@@ -106,6 +135,9 @@ export class TalocodeCore {
 
   async shutdown(): Promise<void> {
     await stopAllSessions(this.store);
+    if (this.browserRuntime) {
+      await this.browserRuntime.shutdown();
+    }
   }
 
   async health(): Promise<HealthStatus> {
@@ -266,6 +298,190 @@ export class TalocodeCore {
 
   async deleteProject(id: string): Promise<{ deleted: boolean }> {
     return deleteProject(this.store, id);
+  }
+
+  async getProjectContextCache(projectId: string): Promise<{
+    packs: ContextPack[];
+    stats: { totalPacks: number; activePacks: number; stalePacks: number; totalHits: number; totalMisses: number };
+  }> {
+    const data = await this.store.read();
+    const project = data.projects.find((p) => p.id === projectId);
+    if (!project) throw new TalocodeError(404, 'Project not found');
+    const packs = data.contextPacks.filter((p) => p.projectId === projectId);
+    return {
+      packs,
+      stats: {
+        totalPacks: packs.length,
+        activePacks: packs.filter((p) => p.status === 'active').length,
+        stalePacks: packs.filter((p) => p.status === 'stale').length,
+        totalHits: packs.reduce((sum, p) => sum + p.cacheHitCount, 0),
+        totalMisses: packs.reduce((sum, p) => sum + p.cacheMissCount, 0),
+      },
+    };
+  }
+
+  async rebuildContextPack(projectId: string): Promise<ContextPack> {
+    const data = await this.store.read();
+    const project = data.projects.find((p) => p.id === projectId);
+    if (!project) throw new TalocodeError(404, 'Project not found');
+    const existing = data.contextPacks.find((p) => p.projectId === projectId && p.status !== 'archived');
+    let pack: ContextPack;
+    if (existing) {
+      pack = await rebuildContextPackFn(existing, project.path);
+    } else {
+      pack = await buildContextPack(projectId, project.path);
+    }
+    await this.store.update((next) => {
+      const idx = next.contextPacks.findIndex((p) => p.id === pack.id);
+      if (idx >= 0) {
+        next.contextPacks[idx] = pack;
+      } else {
+        next.contextPacks.push(pack);
+      }
+    });
+    return pack;
+  }
+
+  async validateContextPack(projectId: string): Promise<{
+    fresh: boolean;
+    stale: boolean;
+    changedFiles: string[];
+    pack: ContextPack | null;
+  }> {
+    const data = await this.store.read();
+    const project = data.projects.find((p) => p.id === projectId);
+    if (!project) throw new TalocodeError(404, 'Project not found');
+    const pack = data.contextPacks.find((p) => p.projectId === projectId && p.status === 'active');
+    if (!pack) {
+      return { fresh: false, stale: false, changedFiles: [], pack: null };
+    }
+    const { fresh, changedFiles } = await validateContextPack(pack, project.path);
+    const now = new Date().toISOString();
+    if (!fresh) {
+      await this.store.update((next) => {
+        const p = next.contextPacks.find((p2) => p2.id === pack.id);
+        if (p) {
+          p.status = 'stale';
+          p.cacheMissCount += 1;
+          p.updatedAt = now;
+        }
+      });
+      return { fresh: false, stale: true, changedFiles, pack: { ...pack, status: 'stale' } };
+    }
+    await this.store.update((next) => {
+      const p = next.contextPacks.find((p2) => p2.id === pack.id);
+      if (p) {
+        p.cacheHitCount += 1;
+        p.lastUsedAt = now;
+      }
+    });
+    return { fresh: true, stale: false, changedFiles: [], pack };
+  }
+
+  async getSessionCacheMeta(sessionId: string): Promise<ContextCacheMeta> {
+    const data = await this.store.read();
+    const session = data.sessions.find((s) => s.id === sessionId);
+    if (!session) throw new TalocodeError(404, 'Session not found');
+    const project = data.projects.find((p) => p.id === session.projectId);
+    const pack = data.contextPacks.find((p) => p.projectId === session.projectId && p.status === 'active');
+    if (!pack || !project) {
+      return {
+        cacheStatus: 'disabled',
+        estimatedCachedTokens: 0,
+        estimatedFreshTokens: 0,
+        estimatedTotalTokens: 0,
+        estimatedSavingsPercent: 0,
+        changedFiles: [],
+      };
+    }
+    const meta = await computeCacheMeta(pack, project.path);
+    const now = new Date().toISOString();
+    await this.store.update((next) => {
+      const p = next.contextPacks.find((p2) => p2.id === pack.id);
+      if (p) {
+        p.lastUsedAt = now;
+        if (meta.cacheStatus === 'hit') p.cacheHitCount += 1;
+        else p.cacheMissCount += 1;
+      }
+    });
+    return meta;
+  }
+
+  async listBrowserSessions(): Promise<BrowserSession[]> {
+    return this.getBrowserRuntime().listSessions();
+  }
+
+  async getBrowserSession(id: string): Promise<BrowserSession> {
+    return this.getBrowserRuntime().getSession(id);
+  }
+
+  async createBrowserSession(input: {
+    name: string;
+    startUrl?: string;
+    headless?: boolean;
+    viewport?: { width: number; height: number };
+    notes?: string;
+  }): Promise<BrowserSession> {
+    return this.getBrowserRuntime().createSession(input);
+  }
+
+  async updateBrowserSession(id: string, patch: {
+    name?: string;
+    startUrl?: string;
+    notes?: string;
+  }): Promise<BrowserSession> {
+    return this.getBrowserRuntime().updateSession(id, patch);
+  }
+
+  async deleteBrowserSession(id: string): Promise<{ deleted: boolean }> {
+    return this.getBrowserRuntime().deleteSession(id);
+  }
+
+  async startBrowserSession(id: string): Promise<BrowserSession> {
+    return this.getBrowserRuntime().startSession(id);
+  }
+
+  async stopBrowserSession(id: string): Promise<BrowserSession> {
+    return this.getBrowserRuntime().stopSession(id);
+  }
+
+  async restartBrowserSession(id: string): Promise<BrowserSession> {
+    return this.getBrowserRuntime().restartSession(id);
+  }
+
+  async openBrowserPage(id: string, url: string): Promise<{ opened: boolean }> {
+    await this.getBrowserRuntime().openPage(id, url);
+    return { opened: true };
+  }
+
+  async getBrowserSessionState(id: string): Promise<{ running: boolean; status: string; activePagesCount: number }> {
+    return this.getBrowserRuntime().getSessionState(id);
+  }
+
+  async exportBrowserStorageState(id: string): Promise<unknown> {
+    return this.getBrowserRuntime().exportSessionStorageState(id);
+  }
+
+  async clearBrowserSessionData(id: string): Promise<{ cleared: boolean }> {
+    return this.getBrowserRuntime().clearSessionData(id);
+  }
+
+  async getBrowserAuditLog(): Promise<BrowserAuditEvent[]> {
+    const { readFile } = await import('fs/promises');
+    const { join } = await import('path');
+    const { getDataDir } = await import('./paths');
+    const path = join(getDataDir(), 'browser-audit.jsonl');
+    try {
+      const raw = await readFile(path, 'utf-8');
+      return raw
+        .split('\n')
+        .filter((line) => line.trim())
+        .map((line) => JSON.parse(line) as BrowserAuditEvent)
+        .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
+        .slice(0, 100);
+    } catch {
+      return [];
+    }
   }
 
   async listSessions(filters: { projectId?: string; status?: SessionStatus } = {}): Promise<AgentSession[]> {

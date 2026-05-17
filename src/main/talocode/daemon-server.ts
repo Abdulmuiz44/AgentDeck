@@ -14,6 +14,7 @@ import {
   parseSessionRequest,
   parseSessionResizeRequest,
 } from './core';
+import { BrowserRuntimeError } from './browser-runtime';
 import { DEFAULT_HOST, DEFAULT_PORT, envValue } from './paths';
 import { bearerToken, isLocalRequest, redactSensitive } from './remote';
 import type { IntegrationTarget, SessionStatus, SessionStreamEvent } from './types';
@@ -147,14 +148,58 @@ export class TalocodeDaemon {
         if (req.method === 'DELETE') return sendJson(res, 200, await this.core.deleteProject(id));
       }
 
-      if (req.method === 'GET' && path === '/api/sessions') {
-        return sendJson(res, 200, await this.core.listSessions({
-          projectId: url.searchParams.get('projectId') || undefined,
-          status: (url.searchParams.get('status') || undefined) as SessionStatus | undefined,
+      const contextCacheMatch = path.match(/^\/api\/projects\/([^/]+)\/context-cache(?:\/(rebuild|validate))?$/);
+      if (contextCacheMatch) {
+        const projectId = decodeURIComponent(contextCacheMatch[1]);
+        const action = contextCacheMatch[2];
+        if (req.method === 'GET' && !action) return sendJson(res, 200, await this.core.getProjectContextCache(projectId));
+        if (req.method === 'POST' && action === 'rebuild') return sendJson(res, 200, await this.core.rebuildContextPack(projectId));
+        if (req.method === 'POST' && action === 'validate') return sendJson(res, 200, await this.core.validateContextPack(projectId));
+      }
+
+      if (req.method === 'GET' && path === '/api/browser/sessions') return sendJson(res, 200, await this.core.listBrowserSessions());
+      if (req.method === 'POST' && path === '/api/browser/sessions') {
+        const body = asRecord(await readBody(req));
+        return sendJson(res, 201, await this.core.createBrowserSession({
+          name: requiredString(body.name, 'name'),
+          startUrl: optionalString(body.startUrl),
+          headless: typeof body.headless === 'boolean' ? body.headless : undefined,
+          viewport: body.viewport as { width: number; height: number } | undefined,
+          notes: optionalString(body.notes),
         }));
       }
+      if (req.method === 'GET' && path === '/api/browser/audit') return sendJson(res, 200, await this.core.getBrowserAuditLog());
+      const browserSessionMatch = path.match(/^\/api\/browser\/sessions\/([^/]+)(?:\/(start|stop|restart|open|export-storage|clear-data|state))?$/);
+      if (browserSessionMatch) {
+        const id = decodeURIComponent(browserSessionMatch[1]);
+        const action = browserSessionMatch[2];
+        if (req.method === 'GET' && !action) return sendJson(res, 200, await this.core.getBrowserSession(id));
+        if (req.method === 'PATCH' && !action) {
+          const body = asRecord(await readBody(req));
+          return sendJson(res, 200, await this.core.updateBrowserSession(id, {
+            name: optionalString(body.name),
+            startUrl: optionalString(body.startUrl),
+            notes: optionalString(body.notes),
+          }));
+        }
+        if (req.method === 'DELETE' && !action) return sendJson(res, 200, await this.core.deleteBrowserSession(id));
+        if (req.method === 'POST' && action === 'start') return sendJson(res, 200, await this.core.startBrowserSession(id));
+        if (req.method === 'POST' && action === 'stop') return sendJson(res, 200, await this.core.stopBrowserSession(id));
+        if (req.method === 'POST' && action === 'restart') return sendJson(res, 200, await this.core.restartBrowserSession(id));
+        if (req.method === 'POST' && action === 'open') {
+          const body = asRecord(await readBody(req));
+          return sendJson(res, 200, await this.core.openBrowserPage(id, requiredString(body.url, 'url')));
+        }
+        if (req.method === 'POST' && action === 'export-storage') return sendJson(res, 200, await this.core.exportBrowserStorageState(id));
+        if (req.method === 'POST' && action === 'clear-data') return sendJson(res, 200, await this.core.clearBrowserSessionData(id));
+        if (req.method === 'GET' && action === 'state') return sendJson(res, 200, await this.core.getBrowserSessionState(id));
+      }
+      if (req.method === 'GET' && path === '/api/sessions') return sendJson(res, 200, await this.core.listSessions({
+        projectId: url.searchParams.get('projectId') || undefined,
+        status: (url.searchParams.get('status') || undefined) as SessionStatus | undefined,
+      }));
       if (req.method === 'POST' && path === '/api/sessions') return sendJson(res, 200, await this.core.createSession(parseSessionRequest(await readBody(req))));
-      const sessionMatch = path.match(/^\/api\/sessions\/([^/]+)(?:\/(start|stop|restart|logs|stream|input|resize))?$/);
+      const sessionMatch = path.match(/^\/api\/sessions\/([^/]+)(?:\/(start|stop|restart|logs|stream|input|resize|cache-meta))?$/);
       if (sessionMatch) {
         const id = decodeURIComponent(sessionMatch[1]);
         const action = sessionMatch[2];
@@ -164,6 +209,7 @@ export class TalocodeDaemon {
         if (req.method === 'POST' && action === 'restart') return sendJson(res, 200, await this.core.restartSession(id));
         if (req.method === 'GET' && action === 'logs') return sendJson(res, 200, await this.core.getSessionLogs(id));
         if (req.method === 'GET' && action === 'stream') return this.streamSession(id, res);
+        if (req.method === 'GET' && action === 'cache-meta') return sendJson(res, 200, await this.core.getSessionCacheMeta(id));
         if (req.method === 'POST' && action === 'input') {
           const body = parseSessionInputRequest(await readBody(req));
           return sendJson(res, 200, await this.core.sendSessionInput(id, body.data));
@@ -201,7 +247,9 @@ export class TalocodeDaemon {
       }
       return sendJson(res, 404, { error: 'Not found' });
     } catch (error) {
-      const status = error instanceof TalocodeError ? error.status : 500;
+      const status = error instanceof TalocodeError ? error.status
+        : error instanceof BrowserRuntimeError ? error.status
+        : 500;
       const message = error instanceof Error ? error.message : 'Unknown error';
       return sendJson(res, status, { error: redact(message) });
     }

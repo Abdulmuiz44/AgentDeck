@@ -1,10 +1,24 @@
 import { createHash, randomBytes, timingSafeEqual } from 'crypto';
-import { networkInterfaces } from 'os';
+import { networkInterfaces, type NetworkInterfaceInfo } from 'os';
 import type { IncomingMessage } from 'http';
 import type { LanAddressCandidate, PairedPhoneDevice, RemoteAccessSettings } from './types';
 
 export const PHONE_SESSION_DAYS = 30;
 const SENSITIVE_PATTERN = /(pair=|token=|accessToken=|authorization:\s*bearer\s+)([^&\s]+)/gi;
+
+let networkInterfacesFailedLogged = false;
+
+function safeNetworkInterfaces(): Record<string, NetworkInterfaceInfo[]> {
+  try {
+    return networkInterfaces() as Record<string, NetworkInterfaceInfo[]>;
+  } catch (error) {
+    if (!networkInterfacesFailedLogged) {
+      console.warn('[Talocode] Unable to enumerate network interfaces — LAN URLs will be unavailable. Error:', (error as Error).message);
+      networkInterfacesFailedLogged = true;
+    }
+    return {};
+  }
+}
 
 export function generateToken(bytes = 24): string {
   return randomBytes(bytes).toString('base64url');
@@ -25,9 +39,10 @@ export function redactSensitive(input: string): string {
   return input.replace(SENSITIVE_PATTERN, (_match, prefix) => `${prefix}[redacted]`);
 }
 
-export function getLanAddressCandidates(interfaces = networkInterfaces()): LanAddressCandidate[] {
+export function getLanAddressCandidates(interfaces?: Record<string, NetworkInterfaceInfo[]>): LanAddressCandidate[] {
+  const ifaces = interfaces ?? safeNetworkInterfaces();
   const candidates: LanAddressCandidate[] = [];
-  for (const [name, entries] of Object.entries(interfaces)) {
+  for (const [name, entries] of Object.entries(ifaces)) {
     for (const entry of entries || []) {
       if (entry.family !== 'IPv4' || entry.internal || !entry.address || entry.address.startsWith('127.')) continue;
       candidates.push({ address: entry.address, interfaceName: name, priority: scoreInterface(name) });
@@ -36,7 +51,7 @@ export function getLanAddressCandidates(interfaces = networkInterfaces()): LanAd
   return candidates.sort((a, b) => b.priority - a.priority || a.interfaceName.localeCompare(b.interfaceName));
 }
 
-export function buildLanUrls(port: number, manualUrl?: string, interfaces = networkInterfaces()): string[] {
+export function buildLanUrls(port: number, manualUrl?: string, interfaces?: Record<string, NetworkInterfaceInfo[]>): string[] {
   const urls = getLanAddressCandidates(interfaces).map((candidate) => `http://${candidate.address}:${port}`);
   return [...new Set([manualUrl, ...urls].filter((url): url is string => Boolean(url)))];
 }

@@ -20,6 +20,21 @@ test('LAN IP detection excludes loopback and prefers Wi-Fi/Ethernet IPv4', () =>
   assert.deepEqual(buildLanUrls(3768, 'http://desk.local:3768', fake), ['http://desk.local:3768', 'http://192.168.1.20:3768', 'http://10.0.0.8:3768', 'http://172.17.0.1:3768']);
 });
 
+test('buildLanUrls returns empty array when networkInterfaces fails', () => {
+  const urls = buildLanUrls(3768);
+  assert.ok(Array.isArray(urls));
+});
+
+test('buildLanUrls still includes manual URL when LAN detection fails', () => {
+  const urls = buildLanUrls(3768, 'http://desk.local:3768', {});
+  assert.deepEqual(urls, ['http://desk.local:3768']);
+});
+
+test('getLanAddressCandidates handles empty interfaces gracefully', () => {
+  const candidates = getLanAddressCandidates({});
+  assert.deepEqual(candidates, []);
+});
+
 test('token hashing verifies with constant-time compatible hashes and redaction hides tokens', () => {
   const token = 'pair-secret-token';
   const hash = hashToken(token);

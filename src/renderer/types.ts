@@ -161,3 +161,64 @@ export interface RemoteAccessView {
   pairingToken?: string;
   phoneUrl?: string;
 }
+
+export interface ContextPackView {
+  id: string;
+  projectId: string;
+  name: string;
+  description?: string;
+  includedFiles: string[];
+  estimatedTokens: number;
+  createdAt: string;
+  updatedAt: string;
+  lastUsedAt?: string;
+  cacheHitCount: number;
+  cacheMissCount: number;
+  status: string;
+}
+
+export interface ContextCacheMetaView {
+  contextPackId?: string;
+  cacheStatus: string;
+  estimatedCachedTokens: number;
+  estimatedFreshTokens: number;
+  estimatedTotalTokens: number;
+  estimatedSavingsPercent: number;
+  changedFiles: string[];
+}
+
+export interface ProjectContextCacheView {
+  packs: ContextPackView[];
+  stats: {
+    totalPacks: number;
+    activePacks: number;
+    stalePacks: number;
+    totalHits: number;
+    totalMisses: number;
+  };
+}
+
+export interface BrowserSessionView {
+  id: string;
+  name: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  lastStartedAt?: string;
+  lastStoppedAt?: string;
+  startUrl?: string;
+  userDataDir: string;
+  viewport?: { width: number; height: number };
+  headless: boolean;
+  notes?: string;
+  lastError?: string;
+}
+
+export interface BrowserAuditEventView {
+  id: string;
+  type: string;
+  sessionId: string;
+  timestamp: string;
+  actor: string;
+  metadata?: Record<string, unknown>;
+}

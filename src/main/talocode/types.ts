@@ -177,10 +177,90 @@ export interface DiscoveryCache {
   lastCheckedAt?: string;
 }
 
+export type ContextPackStatus = 'active' | 'stale' | 'archived';
+export type CacheStatus = 'hit' | 'miss' | 'stale' | 'disabled';
+
+export interface ContextPack {
+  id: string;
+  projectId: string;
+  name: string;
+  description?: string;
+  includedFiles: string[];
+  contentHash: string;
+  manifestHash: string;
+  estimatedTokens: number;
+  createdAt: string;
+  updatedAt: string;
+  lastUsedAt?: string;
+  cacheHitCount: number;
+  cacheMissCount: number;
+  status: ContextPackStatus;
+}
+
+export interface ContextCacheMeta {
+  contextPackId?: string;
+  cacheStatus: CacheStatus;
+  estimatedCachedTokens: number;
+  estimatedFreshTokens: number;
+  estimatedTotalTokens: number;
+  estimatedSavingsPercent: number;
+  changedFiles: string[];
+}
+
+export type BrowserSessionStatus = 'stopped' | 'starting' | 'running' | 'stopping' | 'error';
+export type BrowserAuditEventType =
+  | 'browser.session.created'
+  | 'browser.session.started'
+  | 'browser.session.stopped'
+  | 'browser.session.deleted'
+  | 'browser.session.opened_url'
+  | 'browser.session.storage_exported'
+  | 'browser.session.data_cleared'
+  | 'browser.session.error'
+  | 'browser.session.restarted';
+
+export interface BrowserSession {
+  id: string;
+  name: string;
+  status: BrowserSessionStatus;
+  createdAt: string;
+  updatedAt: string;
+  lastStartedAt?: string;
+  lastStoppedAt?: string;
+  startUrl?: string;
+  userDataDir: string;
+  viewport?: { width: number; height: number };
+  headless: boolean;
+  notes?: string;
+  lastError?: string;
+}
+
+export interface BrowserAuditEvent {
+  id: string;
+  type: BrowserAuditEventType;
+  sessionId: string;
+  timestamp: string;
+  actor: 'user' | 'agent' | 'system';
+  metadata?: Record<string, unknown>;
+}
+
+export interface BrowserRuntimeConfig {
+  enabled: boolean;
+  maxRunningSessions: number;
+  defaultHeadless: boolean;
+  browserChannel?: string;
+  slowMo?: number;
+  defaultViewport?: { width: number; height: number };
+  dataDir: string;
+}
+
 export interface TalocodeStore {
   providers: ProviderConfig[];
   projects: ProjectRegistration[];
   sessions: AgentSession[];
+  contextPacks: ContextPack[];
+  browserSessions: BrowserSession[];
+  browserRuntimeConfig: BrowserRuntimeConfig;
   settings: UserSettings;
   integrationConfigs: IntegrationRecord[];
   discoveryCache?: DiscoveryCache;
