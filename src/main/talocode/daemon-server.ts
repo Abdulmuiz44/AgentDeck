@@ -74,6 +74,13 @@ export class TalocodeDaemon {
       const url = new URL(req.url || '/', `http://${req.headers.host || `${this.host}:${this.port}`}`);
       const path = url.pathname;
       const localRequest = isLocalRequest(req);
+
+      if (req.method === 'POST' && path === '/api/billing/webhook') {
+        const rawBody = await readRawBody(req);
+        const signature = String(req.headers['x-signature'] || req.headers['x-lemon-squeezy-signature'] || '');
+        return sendJson(res, 200, await this.core.recordBillingWebhook(rawBody, signature || undefined));
+      }
+
       const phoneDevice = localRequest ? undefined : await this.core.authenticatePhone(bearerToken(req));
 
       if (req.method === 'GET' && path === '/health') return sendJson(res, 200, await this.core.health());
@@ -114,6 +121,27 @@ export class TalocodeDaemon {
       }
       if (!localRequest && path.startsWith('/api/') && !phoneDevice) throw new TalocodeError(401, 'Phone authorization is required');
       if (!localRequest && isRemoteBlocked(path, req.method || 'GET')) throw new TalocodeError(403, 'This API is not available from phone control');
+
+      if (req.method === 'GET' && path === '/api/billing/config') {
+        requireLocal(localRequest);
+        return sendJson(res, 200, await this.core.getBillingConfig());
+      }
+      if (req.method === 'PATCH' && path === '/api/billing/config') {
+        requireLocal(localRequest);
+        return sendJson(res, 200, await this.core.updateBillingConfig(asRecord(await readBody(req))));
+      }
+      if (req.method === 'POST' && path === '/api/billing/checkout') {
+        requireLocal(localRequest);
+        const body = asRecord(await readBody(req));
+        return sendJson(res, 200, await this.core.createBillingCheckout({
+          planId: requiredBillingPlanId(body.planId),
+          cycle: optionalBillingCycle(body.cycle),
+          seats: optionalNumber(body.seats),
+          email: optionalString(body.email),
+          name: optionalString(body.name),
+          source: optionalString(body.source) || 'talocode',
+        }));
+      }
 
       if (req.method === 'GET' && path === '/api/phone/snapshot') return sendJson(res, 200, await this.core.phoneSafeSnapshot(this.url()));
 
@@ -304,6 +332,20 @@ function optionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value : undefined;
 }
 
+function optionalNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function requiredBillingPlanId(value: unknown): 'free' | 'pro' | 'team' | 'enterprise' {
+  if (value === 'free' || value === 'pro' || value === 'team' || value === 'enterprise') return value;
+  throw new TalocodeError(400, 'planId must be free, pro, team, or enterprise');
+}
+
+function optionalBillingCycle(value: unknown): 'monthly' | 'annual' | undefined {
+  if (value === 'monthly' || value === 'annual') return value;
+  return undefined;
+}
+
 function requireLocal(localRequest: boolean): void {
   if (!localRequest) throw new TalocodeError(403, 'This operation is only available from the desktop localhost dashboard or CLI');
 }
@@ -312,6 +354,7 @@ export function isRemoteBlocked(path: string, method: string): boolean {
   if (method === 'POST' && path === '/api/projects') return true;
   if (method === 'POST' && path === '/api/providers') return true;
   if (method === 'POST' && /^\/api\/providers\/[^/]+\/(test|default)$/.test(path)) return true;
+  if (path.startsWith('/api/billing/')) return true;
   if (method === 'PATCH' || method === 'DELETE') return true;
   if (path.startsWith('/api/integrations/') || path.startsWith('/api/settings/')) return true;
   if (path.endsWith('/resize')) return true;
@@ -321,7 +364,7 @@ export function isRemoteBlocked(path: string, method: string): boolean {
 function setCors(res: ServerResponse): void {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Signature, X-Lemon-Squeezy-Signature');
 }
 
 async function readBody(req: IncomingMessage): Promise<unknown> {
@@ -333,6 +376,12 @@ async function readBody(req: IncomingMessage): Promise<unknown> {
   } catch {
     throw new TalocodeError(400, 'Request body must be valid JSON');
   }
+}
+
+async function readRawBody(req: IncomingMessage): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) chunks.push(Buffer.from(chunk));
+  return Buffer.concat(chunks).toString('utf-8');
 }
 
 function sendJson(res: ServerResponse, status: number, data: unknown): void {

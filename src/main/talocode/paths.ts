@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, copyFileSync, readdirSync, statSync } from 'fs';
 import { homedir } from 'os';
-import { join } from 'path';
+import { join as nativeJoin, posix, win32 } from 'path';
 
 export const DEFAULT_HOST = '127.0.0.1';
 export const DEFAULT_PORT = 3768;
@@ -28,6 +28,7 @@ export function defaultTalocodeDataDir(options: DataDirOptions = {}): string {
   const env = options.env || process.env;
   const platform = options.platform || process.platform;
   const home = options.homeDir || homedir();
+  const join = platform === 'win32' ? win32.join : posix.join;
   if (platform === 'win32') {
     const appData = env.APPDATA || join(home, 'AppData', 'Roaming');
     return join(appData, 'Talocode');
@@ -42,6 +43,7 @@ export function defaultLegacyAgentDeckDataDir(options: DataDirOptions = {}): str
   const env = options.env || process.env;
   const platform = options.platform || process.platform;
   const home = options.homeDir || homedir();
+  const join = platform === 'win32' ? win32.join : posix.join;
   if (platform === 'win32') {
     const appData = env.APPDATA || join(home, 'AppData', 'Roaming');
     return join(appData, 'AgentDeck');
@@ -57,11 +59,11 @@ export function getDataDir(): string {
 }
 
 export function getStorePath(): string {
-  return join(getDataDir(), 'talocode.json');
+  return nativeJoin(getDataDir(), 'talocode.json');
 }
 
 export function getLogsDir(): string {
-  return join(getDataDir(), 'logs');
+  return nativeJoin(getDataDir(), 'logs');
 }
 
 export function prepareDataDirMigration(options: DataDirOptions = {}): void {
@@ -74,15 +76,15 @@ export function prepareDataDirMigration(options: DataDirOptions = {}): void {
   mkdirSync(next, { recursive: true });
   for (const entry of readdirSync(legacy)) {
     if (!entry.endsWith('.json')) continue;
-    const source = join(legacy, entry);
+    const source = nativeJoin(legacy, entry);
     if (!statSync(source).isFile()) continue;
-    const target = join(next, entry === 'agentdeck.json' ? 'talocode.json' : entry.replace(/agentdeck/gi, 'talocode'));
+    const target = nativeJoin(next, entry === 'agentdeck.json' ? 'talocode.json' : entry.replace(/agentdeck/gi, 'talocode'));
     if (!existsSync(target)) copyFileSync(source, target);
   }
 }
 
 export function expandHome(input: string): string {
   if (input === '~') return homedir();
-  if (input.startsWith('~/') || input.startsWith('~\\')) return join(homedir(), input.slice(2));
+  if (input.startsWith('~/') || input.startsWith('~\\')) return nativeJoin(homedir(), input.slice(2));
   return input;
 }

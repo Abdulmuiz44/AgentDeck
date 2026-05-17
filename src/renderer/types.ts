@@ -25,6 +25,9 @@ export interface AgentCommand {
 }
 
 export interface ElectronAPI {
+  shell: {
+    openExternal(url: string): Promise<void>;
+  };
   terminal: {
     create(cwd: string, command: string): Promise<string>;
     write(terminalId: string, data: string): Promise<void>;

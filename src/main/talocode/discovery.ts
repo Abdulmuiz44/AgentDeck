@@ -76,24 +76,26 @@ export async function discoverTool(tool: ToolDefinition): Promise<ToolDiscoveryR
     };
   }
 
-  for (const executable of tool.executableNames) {
-    const path = await commandPath(executable);
-    if (path) {
-      const version = await commandVersion(path, tool.versionArgs);
-      return {
-        id: tool.id,
-        name: tool.name,
-        adapterId: tool.adapter?.id,
-        displayName: tool.name,
-        executable,
-        path,
-        version,
-        status: 'detected',
-        installHint: tool.installHint,
-        docsUrl: tool.docsUrl,
-        lastCheckedAt,
-      };
-    }
+  const candidates = await Promise.all(tool.executableNames.map(async (executable) => ({
+    executable,
+    path: await commandPath(executable),
+  })));
+  const found = candidates.find((candidate) => candidate.path);
+  if (found?.path) {
+    const version = await commandVersion(found.path, tool.versionArgs);
+    return {
+      id: tool.id,
+      name: tool.name,
+      adapterId: tool.adapter?.id,
+      displayName: tool.name,
+      executable: found.executable,
+      path: found.path,
+      version,
+      status: 'detected',
+      installHint: tool.installHint,
+      docsUrl: tool.docsUrl,
+      lastCheckedAt,
+    };
   }
 
   return {

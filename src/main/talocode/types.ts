@@ -5,6 +5,8 @@ export type SessionStatus = 'created' | 'starting' | 'running' | 'stopped' | 'fa
 export type SessionMode = 'process' | 'pty';
 export type SupportedPlatform = 'win32' | 'darwin' | 'linux';
 export type IntegrationTarget = 'codex' | 'opencode';
+export type BillingPlanId = 'free' | 'pro' | 'team' | 'enterprise';
+export type BillingCycle = 'monthly' | 'annual';
 
 export interface ProviderConfig {
   id: string;
@@ -172,6 +174,54 @@ export interface IntegrationRecord {
   createdAt: string;
 }
 
+export interface BillingVariantConfig {
+  monthly?: string;
+  annual?: string;
+}
+
+export interface BillingWebhookEvent {
+  receivedAt: string;
+  eventName?: string;
+  signatureVerified: boolean;
+  payload: unknown;
+}
+
+export interface BillingSettings {
+  provider: 'lemonsqueezy';
+  enabled: boolean;
+  storeSlug?: string;
+  variants: Record<Exclude<BillingPlanId, 'free'>, BillingVariantConfig>;
+  contactSalesUrl?: string;
+  successUrl?: string;
+  webhookSecret?: string;
+  lastCheckoutAt?: string;
+  lastCheckoutPlanId?: BillingPlanId;
+  lastCheckoutCycle?: BillingCycle;
+  lastWebhookEvent?: BillingWebhookEvent;
+  updatedAt: string;
+}
+
+export interface BillingCheckoutRequest {
+  planId: BillingPlanId;
+  cycle?: BillingCycle;
+  seats?: number;
+  email?: string;
+  name?: string;
+  source?: string;
+}
+
+export interface BillingCheckoutResponse {
+  checkoutUrl: string;
+  planId: BillingPlanId;
+  cycle: BillingCycle;
+  provider: 'lemonsqueezy';
+  ready: boolean;
+  issues: string[];
+  storeSlug?: string;
+  variantId?: string;
+  contactSalesUrl?: string;
+}
+
 export interface DiscoveryCache {
   tools: ToolDiscoveryResult[];
   lastCheckedAt?: string;
@@ -263,6 +313,7 @@ export interface TalocodeStore {
   browserRuntimeConfig: BrowserRuntimeConfig;
   settings: UserSettings;
   integrationConfigs: IntegrationRecord[];
+  billing: BillingSettings;
   discoveryCache?: DiscoveryCache;
   lastError?: string;
 }
