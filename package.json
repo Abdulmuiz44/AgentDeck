@@ -60,8 +60,8 @@
     "agentdeck": "./dist/cli/index.js"
   },
   "optionalDependencies": {
-    "node-pty": "^1.0.0",
-    "electron": "^33.0.0"
+    "electron": "^33.4.11",
+    "node-pty": "^1.0.0"
   },
   "repository": {
     "type": "git",
