@@ -16,6 +16,8 @@ It provides a desktop dashboard, a local daemon, a local HTTP API, a phone-optim
 - Provider registry for Ollama, OpenRouter, OpenAI-compatible endpoints, OpenAI, Anthropic, and Gemini-style providers.
 - Coding-agent adapter discovery for installed CLI tools.
 - Project and session management with live output, logs, and start/stop/restart actions.
+- **Context caching** — hash-based stable-file detection, cache hit/miss tracking, token estimation, and provider-neutral caching layer ready for Anthropic/Gemini prompt caching.
+- **Browser runtime** — Playwright-based persistent browser sessions with create/start/stop/restart lifecycle, headless/headed modes, session profiles, storage export, and audit logging.
 - Talocode Phone Control for trusted LAN monitoring and session actions.
 - Integration config generation that stores environment variable names instead of raw API keys.
 - Talocode-managed worktree session patterns documented for safe multi-agent workflows.
@@ -61,6 +63,10 @@ talo sessions list
 talo sessions create --projectId <project-id> --agentId codex-cli --providerId ollama --model llama3.1
 talo sessions start <session-id>
 talo sessions stop <session-id>
+talo browser list
+talo browser create --name "My Workspace" --startUrl https://example.com
+talo browser start <session-id>
+talo browser stop <session-id>
 talo remote enable
 talo worktrees list
 ```
@@ -80,6 +86,12 @@ Talocode resolves environment variables in this order: `TALOCODE_*`, then legacy
 - `TALOCODE_PORT` defaults to `3768`.
 - `TALOCODE_URL` points the CLI at another local daemon URL.
 - `TALOCODE_DATA_DIR` overrides the local data directory.
+- `TALOCODE_BROWSER_RUNTIME_ENABLED` set to `false` to disable browser runtime (default: enabled).
+- `TALOCODE_BROWSER_MAX_SESSIONS` max concurrent browser sessions (default: 3).
+- `TALOCODE_BROWSER_HEADLESS` set to `true` to run browsers without visible windows by default.
+- `TALOCODE_BROWSER_CHANNEL` override browser channel (e.g., `chrome`, `msedge`).
+- `TALOCODE_BROWSER_SLOWMO` milliseconds of slow-motion delay for debugging.
+- `TALOCODE_BROWSER_VIEWPORT` JSON viewport like `{"width":1280,"height":720}`.
 
 Legacy aliases remain available for now: `AGENTDECK_HOST`, `AGENTDECK_PORT`, `AGENTDECK_URL`, and `AGENTDECK_DATA_DIR`.
 
@@ -93,6 +105,14 @@ talo remote enable
 
 Pair with the generated one-time token. Paired phones can monitor Talocode sessions, projects, providers, agents, logs, and start/stop/restart existing sessions. See `docs/PHONE_CONTROL.md` and `docs/REMOTE_ACCESS_SECURITY.md`.
 
+## Context caching
+
+Talocode scans project directories for stable files (`AGENTS.md`, `package.json`, `README.md`, `docs/**/*.md`, etc.), hashes their content, and builds context packs. Validate a pack to see which files have changed between agent runs. This operates at the Talocode orchestration layer — it does not call provider-native caching APIs yet, but the foundation is in place for Anthropic Prompt Caching and Google Context Caching. See `docs/context-caching.md` for details.
+
+## Browser runtime
+
+Talocode can manage persistent Playwright-based browser sessions. Each session gets its own Chromium profile, viewport, and headless/headed mode. Sessions persist across restarts, support storage state export, and log every lifecycle event to an append-only audit trail. This is designed for AI agent workflows, persistent web automation, and human takeover of agent-managed browser sessions — not for evasion, scraping, or captcha bypass. Use the Browser tab in the dashboard or the `talo browser` CLI commands.
+
 ## Worktree sessions
 
 Talocode-managed worktrees are intended to isolate coding-agent sessions by branch or task. See `docs/WORKTREE_SESSIONS.md` if present and `docs/SESSION_ENGINE.md` for the current session engine behavior.
@@ -104,7 +124,7 @@ The architecture documentation is maintained as Markdown and Mermaid text:
 - `docs/ARCHITECTURE.md`
 - `docs/talocode-architecture.mmd`
 
-Core layers include Access Layer, Talocode Core, Provider Router, Execution & Storage, and Talocode-managed worktrees.
+Core layers include Access Layer, Talocode Core, Provider Router, Context Cache Layer, Browser Runtime, Execution & Storage, and Talocode-managed worktrees.
 
 ## Status
 
