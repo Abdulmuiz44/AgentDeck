@@ -1,4 +1,4 @@
-import { ipcMain, dialog } from 'electron';
+import { ipcMain, dialog, shell } from 'electron';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { listWorkspaces, saveWorkspace, deleteWorkspace } from './workspace-store';
@@ -62,5 +62,9 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('terminal:kill', (_event, terminalId: string) => {
     killTerminal(terminalId);
+  });
+
+  ipcMain.handle('shell:openExternal', async (_event, url: string) => {
+    await shell.openExternal(url);
   });
 }

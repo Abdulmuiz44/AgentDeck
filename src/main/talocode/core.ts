@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { getStorePath } from './paths';
 import { agentAdapters } from './agents';
 import { generateOpenAICompatibleConfig, writeOpenAICompatibleConfig } from './config-generator';
+import { billingIssues, buildBillingConfigView, buildCheckoutUrl, parseBillingWebhookEvent, resolveBillingSettings, verifyBillingWebhook } from './billing';
 import { discoverTools } from './discovery';
 import { DEFAULT_HOST, DEFAULT_PORT, envValue, getDataDir } from './paths';
 import { JsonStore } from './persistence';
@@ -29,6 +30,9 @@ import type {
   DaemonStatus,
   HealthStatus,
   IntegrationTarget,
+  BillingCheckoutRequest,
+  BillingCheckoutResponse,
+  BillingSettings,
   ProjectRegistration,
   ProviderConfig,
   PhonePairingResponse,
@@ -101,6 +105,9 @@ export class TalocodeCore {
         ? { ...session, status: 'stopped', processId: undefined, updatedAt: new Date().toISOString(), error: 'Daemon restarted while session was active' }
         : session);
       if (!next.settings.defaultProviderId) next.settings.defaultProviderId = data.providers.find((provider) => provider.isDefault)?.id || 'ollama';
+    });
+    void this.refreshDiscovery().catch((error) => {
+      console.warn('[Talocode] discovery warm-up failed:', error);
     });
   }
 
@@ -236,10 +243,11 @@ export class TalocodeCore {
   }
 
   async listAgents(): Promise<AgentAdapter[]> {
-    const discovered = await this.discover(true);
+    const data = await this.store.read();
+    const discovered = data.discoveryCache?.tools || [];
     return agentAdapters.map((adapter) => ({
       ...adapter,
-      status: discovered.find((item) => item.id === adapter.id)?.status || adapter.status,
+      status: discovered.find((item) => item.id === adapter.id)?.status || 'unknown',
     }));
   }
 
@@ -319,7 +327,7 @@ export class TalocodeCore {
 
   async discover(useCache = true): Promise<ToolDiscoveryResult[]> {
     const data = await this.store.read();
-    if (useCache && data.discoveryCache?.tools?.length) return data.discoveryCache.tools;
+    if (useCache) return data.discoveryCache?.tools || [];
     return this.refreshDiscovery();
   }
 
@@ -516,6 +524,65 @@ export class TalocodeCore {
     return { ...data, providers: data.providers.map(redactProvider) };
   }
 
+  async getBillingConfig(): Promise<ReturnType<typeof buildBillingConfigView>> {
+    const data = await this.store.read();
+    return buildBillingConfigView(data.billing);
+  }
+
+  async updateBillingConfig(request: Partial<BillingSettings>): Promise<ReturnType<typeof buildBillingConfigView>> {
+    await this.store.update((data) => {
+      data.billing = {
+        ...data.billing,
+        ...request,
+        provider: 'lemonsqueezy',
+        variants: {
+          pro: {
+            monthly: trim(request.variants?.pro?.monthly),
+            annual: trim(request.variants?.pro?.annual),
+          },
+          team: {
+            monthly: trim(request.variants?.team?.monthly),
+            annual: trim(request.variants?.team?.annual),
+          },
+          enterprise: {
+            monthly: trim(request.variants?.enterprise?.monthly),
+            annual: trim(request.variants?.enterprise?.annual),
+          },
+        },
+        storeSlug: trim(request.storeSlug),
+        contactSalesUrl: trim(request.contactSalesUrl),
+        successUrl: trim(request.successUrl),
+        webhookSecret: trim(request.webhookSecret),
+        updatedAt: new Date().toISOString(),
+      };
+    });
+    return this.getBillingConfig();
+  }
+
+  async createBillingCheckout(request: BillingCheckoutRequest): Promise<BillingCheckoutResponse> {
+    const data = await this.store.read();
+    const response = buildCheckoutUrl(resolveBillingSettings(data.billing), request);
+    await this.store.update((store) => {
+      store.billing.lastCheckoutAt = new Date().toISOString();
+      store.billing.lastCheckoutPlanId = request.planId;
+      store.billing.lastCheckoutCycle = request.cycle || 'monthly';
+      store.billing.enabled = response.ready || store.billing.enabled;
+    });
+    return response;
+  }
+
+  async recordBillingWebhook(rawBody: string, signature?: string): Promise<{ accepted: boolean; verified: boolean; event?: unknown; issues: string[] }> {
+    const data = await this.store.read();
+    const verified = verifyBillingWebhook(rawBody, signature, data.billing.webhookSecret);
+    const event = parseBillingWebhookEvent(rawBody, verified);
+    await this.store.update((store) => {
+      store.billing.lastWebhookEvent = event;
+      store.billing.updatedAt = new Date().toISOString();
+      if (verified) store.billing.enabled = true;
+    });
+    return { accepted: true, verified, event, issues: billingIssues(data.billing) };
+  }
+
   private async providerForIntegration(request: ConfigureIntegrationRequest): Promise<ProviderConfig> {
     const data = await this.store.read();
     const provider = data.providers.find((item) => item.id === request.providerId) || data.providers.find((item) => item.id === request.provider);
@@ -549,6 +616,11 @@ export class TalocodeError extends Error {
   constructor(public readonly status: number, message: string) {
     super(message);
   }
+}
+
+function trim(value?: string): string | undefined {
+  const next = value?.trim();
+  return next ? next : undefined;
 }
 
 export function asObject(value: unknown): Record<string, unknown> {

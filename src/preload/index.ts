@@ -32,6 +32,9 @@ const api: ElectronAPI = {
     selectDirectory: () => ipcRenderer.invoke('fs:selectDirectory'),
     readPackageJson: (path) => ipcRenderer.invoke('fs:readPackageJson', path),
   },
+  shell: {
+    openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
+  },
 };
 
 contextBridge.exposeInMainWorld('electronAPI', api);

@@ -1,8 +1,10 @@
 import { mkdir, readFile, rename, writeFile } from 'fs/promises';
 import { dirname, resolve } from 'path';
+import { randomUUID } from 'crypto';
 import type { TalocodeStore } from './types';
 import { DEFAULT_HOST, DEFAULT_PORT, getStorePath, prepareDataDirMigration } from './paths';
 import { defaultProviders } from './providers';
+import { defaultBillingSettings } from './billing';
 
 export function defaultStore(): TalocodeStore {
   return {
@@ -22,6 +24,7 @@ export function defaultStore(): TalocodeStore {
       },
     },
     integrationConfigs: [],
+    billing: defaultBillingSettings(),
     discoveryCache: { tools: [] },
   };
 }
@@ -54,6 +57,14 @@ export class JsonStore {
           },
         },
         integrationConfigs: parsed.integrationConfigs || [],
+        billing: {
+          ...defaults.billing,
+          ...(parsed.billing || {}),
+          variants: {
+            ...defaults.billing.variants,
+            ...((parsed.billing || {}).variants || {}),
+          },
+        },
         discoveryCache: parsed.discoveryCache || defaults.discoveryCache,
         lastError: parsed.lastError,
       };
@@ -66,7 +77,7 @@ export class JsonStore {
 
   async write(store: TalocodeStore): Promise<void> {
     await this.ensure();
-    const tmp = `${this.storePath}.tmp`;
+    const tmp = `${this.storePath}.${process.pid}.${randomUUID()}.tmp`;
     await writeFile(tmp, JSON.stringify(store, null, 2), 'utf-8');
     await rename(tmp, this.storePath);
   }

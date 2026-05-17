@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm, mkdir, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
-import { join, win32 } from 'path';
+import { join, posix, win32 } from 'path';
 import { buildConfigBackupPath, writeOpenAICompatibleConfig } from '../main/talocode/config-generator';
 import { resolveDataDir } from '../main/talocode/paths';
 import { buildSessionLogPath, normalizeProjectPath, validateProjectPath } from '../main/talocode/sessions';
@@ -24,7 +24,7 @@ test('validates project paths with spaces and rejects missing paths', async () =
 });
 
 test('builds log paths under data logs directory without shell interpolation', () => {
-  assert.equal(buildSessionLogPath('session-1', 'C:\\Users\\Name With Spaces\\AppData\\Roaming\\Talocode\\logs'), 'C:\\Users\\Name With Spaces\\AppData\\Roaming\\Talocode\\logs/session-1.log');
+  assert.equal(buildSessionLogPath('session-1', 'C:\\Users\\Name With Spaces\\AppData\\Roaming\\Talocode\\logs'), win32.join('C:\\Users\\Name With Spaces\\AppData\\Roaming\\Talocode\\logs', 'session-1.log'));
 });
 
 test('builds config backup paths and writes backup for paths with spaces', async () => {
@@ -45,7 +45,7 @@ test('builds config backup paths and writes backup for paths with spaces', async
 
 test('resolves Windows app data directory from APPDATA', () => {
   const dataDir = resolveDataDir({ platform: 'win32', env: { APPDATA: 'C:\\Users\\Name With Spaces\\AppData\\Roaming' }, homeDir: 'C:\\Users\\Name With Spaces' });
-  assert.equal(dataDir, 'C:\\Users\\Name With Spaces\\AppData\\Roaming/Talocode');
+  assert.equal(dataDir, win32.join('C:\\Users\\Name With Spaces\\AppData\\Roaming', 'Talocode'));
 });
 
 test('Talocode env vars take precedence over legacy AgentDeck env vars', () => {
@@ -68,5 +68,5 @@ test('legacy AgentDeck data dir env var remains a fallback', () => {
 
 test('resolves Linux Talocode config directory by default', () => {
   const dataDir = resolveDataDir({ platform: 'linux', env: {}, homeDir: '/home/dev' });
-  assert.equal(dataDir, '/home/dev/.config/talocode');
+  assert.equal(dataDir, posix.join('/home/dev', '.config', 'talocode'));
 });
