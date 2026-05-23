@@ -1,7 +1,7 @@
 {
   "name": "talocode",
   "version": "0.1.0",
-  "description": "Local-first control plane for coding agents.",
+  "description": "Legacy Talocode experiment for local agent orchestration.",
   "main": "dist/main/index.js",
   "scripts": {
     "dev": "npm run build:main && concurrently \"vite\" \"wait-on http://localhost:5173 && node scripts/start-electron.mjs\"",
